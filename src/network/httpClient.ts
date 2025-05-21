@@ -149,7 +149,8 @@ export function createRetryAgent(options: HttpClientOptions = {}): Dispatcher {
       // Extract attempt number from context.state.counter (undici RetryHandler pattern)
       const attempt = typeof context.state.counter === 'number' ? context.state.counter : 0;
       const maxRetries = retryOptions.maxRetries ?? DEFAULT_MAX_RETRIES;
-      const isMaxed = attempt >= maxRetries;
+      const isMaxed = attempt > maxRetries;
+
       if (isMaxed) {
         logger.warn(`[RetryAgent] Max retries reached (${attempt}/${maxRetries}) for request. Aborting.`);
         cb(err);

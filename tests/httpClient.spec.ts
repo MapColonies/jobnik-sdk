@@ -5,6 +5,7 @@
 import { MockAgent, MockPool } from 'undici';
 import { createRetryAgent } from '../src/network/httpClient';
 
+/* eslint-disable */
 // Add type declaration for global mockAgent
 declare global {
   var mockAgentForTest: MockAgent;
@@ -18,13 +19,13 @@ jest.mock('undici', () => {
   return {
     ...originalModule,
     // Mock agent constructor to return our mockAgent
-    // eslint-disable-next-line camelcase
     Agent: jest.fn().mockImplementation(() => {
       // We'll set this in the test
       return global.mockAgentForTest;
     }),
   };
 });
+/* eslint-enable */
 
 describe('createRetryAgent', () => {
   let mockAgent: MockAgent;
@@ -41,13 +42,11 @@ describe('createRetryAgent', () => {
   afterEach(async () => {
     await mockAgent.close();
     // Optional property can be deleted
-    if (global.mockAgentForTest) {
-      // @ts-ignore
-      delete global.mockAgentForTest;
-    }
+    // @ts-expect-error its a global variable
+    delete global.mockAgentForTest;
   });
 
-  it.only('should retry on failure and succeed on retry', async () => {
+  it('should retry on failure and succeed on retry', async () => {
     expect.assertions(2);
     mockPool.intercept({ path: '/test', method: 'GET' }).reply(500, 'fail').times(1);
     mockPool.intercept({ path: '/test', method: 'GET' }).reply(200, 'ok').times(1);
@@ -58,7 +57,7 @@ describe('createRetryAgent', () => {
     });
     try {
       const req = agent.request({ origin: 'http://localhost:8080', path: '/test', method: 'GET' });
-      const res = await req.catch(() => {});
+      const res = await req;
 
       expect(res.statusCode).toBe(200);
       const data = await res.body.text();
