@@ -145,7 +145,7 @@ export function createRetryAgent(options: HttpClientOptions = {}): Dispatcher {
     errorCodes: retryOptions.errorCodes ?? DEFAULT_RETRY_ERROR_CODES,
     retry: (err: Error, context, cb: (err?: Error | null) => void): void => {
       // Extract attempt number from context.state.counter (undici RetryHandler pattern)
-      const attempt = typeof context.state.counter === 'number' ? context.state.counter : 0;
+      const attempt = context.state.counter;
       const maxRetries = retryOptions.maxRetries ?? DEFAULT_MAX_RETRIES;
       const isMaxed = attempt > maxRetries;
 
@@ -159,6 +159,7 @@ export function createRetryAgent(options: HttpClientOptions = {}): Dispatcher {
         initialBaseRetryDelayMs * Math.pow(RETRY_BACKOFF_FACTOR, Math.min(attempt, MAX_SAFE_RETRY_COUNT)),
         MAX_RETRY_DELAY_MS
       );
+
       // If jitter is disabled, use only the base delay
       const jitterFactor = disableJitter ? 1 : JITTER_MIN_FACTOR + Math.random() * maxJitterFactor;
       const delay = Math.floor(baseDelay * jitterFactor);
