@@ -55,16 +55,12 @@ describe('createRetryAgent', () => {
       retry: { maxRetries: 1, statusCodes: [500] },
       agentOptions: { keepAliveTimeout: 1 },
     });
-    try {
-      const req = agent.request({ origin: 'http://localhost:8080', path: '/test', method: 'GET' });
-      const res = await req;
+    const req = agent.request({ origin: 'http://localhost:8080', path: '/test', method: 'GET' });
+    const res = await req;
 
-      expect(res.statusCode).toBe(200);
-      const data = await res.body.text();
-      expect(data).toBe('ok');
-    } catch (error) {
-      console.error('Request failed:', error);
-    }
+    expect(res.statusCode).toBe(200);
+    const data = await res.body.text();
+    expect(data).toBe('ok');
   });
 
   it('should not retry if status code is not in statusCodes', async () => {
