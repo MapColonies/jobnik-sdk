@@ -73,12 +73,7 @@ interface HttpClientOptions {
 /**
  * HTTP status codes that should trigger a retry by default.
  */
-const DEFAULT_RETRY_STATUS_CODES = [
-  StatusCodes.INTERNAL_SERVER_ERROR,
-  StatusCodes.BAD_GATEWAY,
-  StatusCodes.SERVICE_UNAVAILABLE,
-  StatusCodes.GATEWAY_TIMEOUT,
-];
+const DEFAULT_RETRY_STATUS_CODES = [StatusCodes.BAD_GATEWAY, StatusCodes.SERVICE_UNAVAILABLE, StatusCodes.GATEWAY_TIMEOUT];
 
 /**
  * Error codes that should trigger a retry by default.
@@ -148,9 +143,7 @@ export function createRetryAgent(options: HttpClientOptions = {}): Dispatcher {
       const attempt = context.state.counter;
       const maxRetries = retryOptions.maxRetries ?? DEFAULT_MAX_RETRIES;
       const isMaxed = attempt > maxRetries;
-
       if (isMaxed) {
-        logger.warn(`[RetryAgent] Max retries reached (${attempt}/${maxRetries}) for request. Aborting.`);
         cb(err);
         return;
       }
