@@ -107,3 +107,6 @@ dist
 
 # reports of jest tests
 reports
+context
+index.mjs
+html/
