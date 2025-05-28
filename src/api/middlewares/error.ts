@@ -1,6 +1,14 @@
 import type { Middleware } from 'openapi-fetch';
 import statusCodes from 'http-status-codes';
-import { NetworkError, BadRequestError, InternalServerError, JOBNIK_SDK_ERROR_CODES } from '../../errors/sdkErrors';
+import {
+  NetworkError,
+  BadRequestError,
+  InternalServerError,
+  JOBNIK_SDK_ERROR_CODES,
+  BadGatewayError,
+  GatewayTimeoutError,
+  ServiceUnavailableError,
+} from '../../errors/sdkErrors';
 import { JobnikSDKError } from '../../errors/baseError';
 import { ErrorContext } from './common';
 
@@ -63,7 +71,7 @@ const handleNetworkError = (error: unknown, context: ErrorContext): Error => {
 
 const handleHttpError = (originalError: unknown, context: ErrorContext): Error | void => {
   const { url, method } = context;
-  console.log(originalError);
+  console.log('this is the error', originalError);
 
   if (
     !(
@@ -83,9 +91,11 @@ const handleHttpError = (originalError: unknown, context: ErrorContext): Error |
   switch (statusCode) {
     // Infrastructure errors that can occur even if not in OpenAPI spec
     case statusCodes.BAD_GATEWAY:
-    case statusCodes.SERVICE_UNAVAILABLE: //
+      return new BadGatewayError(`Service temporarily unavailable for ${method} ${url}. Please retry later.`, undefined, originalError);
+    case statusCodes.SERVICE_UNAVAILABLE:
+      return new ServiceUnavailableError(`Service temporarily unavailable for ${method} ${url}. Please retry later.`, undefined, originalError);
     case statusCodes.GATEWAY_TIMEOUT:
-      return new InternalServerError(`Service temporarily unavailable for ${method} ${url}. Please retry later.`, undefined, originalError);
+      return new GatewayTimeoutError(`Service temporarily unavailable for ${method} ${url}. Please retry later.`, undefined, originalError);
 
     default:
       // Handle other status codes by category
