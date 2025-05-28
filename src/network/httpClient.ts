@@ -132,8 +132,6 @@ export function createRetryAgent(options: HttpClientOptions = {}): Dispatcher {
   const baseAgent = new Agent(agentOptions);
 
   // Create the RetryAgent with proper configuration
-  // We need to cast to unknown and then any here to fix the type mismatch
-  // between our options and what RetryAgent expects
   const retryAgent = new RetryAgent(baseAgent, {
     maxRetries: retryOptions.maxRetries ?? DEFAULT_MAX_RETRIES,
     statusCodes: retryOptions.statusCodes ?? DEFAULT_RETRY_STATUS_CODES,

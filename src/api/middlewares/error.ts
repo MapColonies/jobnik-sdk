@@ -9,7 +9,6 @@ import {
   GatewayTimeoutError,
   ServiceUnavailableError,
 } from '../../errors/sdkErrors';
-import { JobnikSDKError } from '../../errors/baseError';
 import { ErrorContext } from './common';
 
 function isObjectWithMessage(error: unknown): error is { message: string } {
