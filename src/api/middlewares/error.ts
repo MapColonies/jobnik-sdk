@@ -71,7 +71,6 @@ const handleNetworkError = (error: unknown, context: ErrorContext): Error => {
 
 const handleHttpError = (originalError: unknown, context: ErrorContext): Error | void => {
   const { url, method } = context;
-  console.log('this is the error', originalError);
 
   if (
     !(
@@ -127,9 +126,6 @@ export const createErrorHandlingMiddleware = (): Exclude<Middleware['onError'], 
       method: request.method,
     };
 
-    if (error instanceof JobnikSDKError) {
-      return;
-    }
     const res = handleHttpError(error, context);
 
     if (res instanceof Error) {

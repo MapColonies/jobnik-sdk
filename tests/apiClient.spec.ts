@@ -1,6 +1,7 @@
 /**
  * @fileoverview Tests for API client with focus on error handling middleware using undici MockAgent.
  */
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MockAgent, MockPool } from 'undici';
 import { createApiClient } from '../src/api/index';
 import {
@@ -20,14 +21,14 @@ declare global {
 }
 
 // Mock the Agent constructor from undici to use our MockAgent instance
-jest.mock('undici', () => {
+vi.mock('undici', async () => {
   // Store the actual implementation
-  const originalModule = jest.requireActual('undici');
+  const originalModule = await vi.importActual('undici');
 
   return {
     ...originalModule,
     // Mock agent constructor to return our mockAgent
-    Agent: jest.fn().mockImplementation(() => {
+    Agent: vi.fn().mockImplementation(() => {
       // We'll set this in the test
       return global.mockAgentForTest;
     }),
@@ -45,7 +46,7 @@ describe('API Client Error Handling Middleware', () => {
   // Test matrix for retry configurations
   const retryConfigs = [
     { name: 'without retry', maxRetries: 0 },
-    // { name: 'with retry', maxRetries: 1 },
+    { name: 'with retry', maxRetries: 1 },
   ] as const;
 
   describe.each(retryConfigs)('$name (maxRetries: $maxRetries)', ({ maxRetries }) => {
@@ -73,7 +74,6 @@ describe('API Client Error Handling Middleware', () => {
       describe('400 Bad Request', () => {
         it('should throw BadRequestError for 400 with simple error message', async () => {
           const errorResponse = { message: 'Invalid job parameters' };
-
           mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(400, JSON.stringify(errorResponse), {
             headers: { 'content-type': 'application/json' },
           });
@@ -181,8 +181,9 @@ describe('API Client Error Handling Middleware', () => {
       });
 
       describe('Infrastructure Errors', () => {
-        it.only('should throw BadGatewayError for 502 Bad Gateway', async () => {
-          mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(502, 'Bad Gateway');
+        it('should throw BadGatewayError for 502 Bad Gateway', async () => {
+          // Set up the mock to respond with the same error for all requests (handles retries)
+          mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(502, 'Bad Gateway').persist();
 
           const reqPromise = apiClient.GET('/jobs');
 
@@ -191,7 +192,7 @@ describe('API Client Error Handling Middleware', () => {
         });
 
         it('should throw ServiceUnavailableError for 503 Service Unavailable', async () => {
-          mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(503, 'Service Unavailable');
+          mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(503, 'Service Unavailable').persist();
 
           const reqPromise = apiClient.GET('/jobs');
 
@@ -200,7 +201,7 @@ describe('API Client Error Handling Middleware', () => {
         });
 
         it('should throw GatewayTimeoutError for 504 Gateway Timeout', async () => {
-          mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(504, 'Gateway Timeout');
+          mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(504, 'Gateway Timeout').persist();
 
           const reqPromise = apiClient.GET('/jobs');
 
@@ -238,7 +239,7 @@ describe('API Client Error Handling Middleware', () => {
       it('should throw NetworkError for connection refused', async () => {
         const connectionError = new TypeError('fetch failed: ECONNREFUSED');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(connectionError);
+        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(connectionError).persist();
 
         const reqPromise = apiClient.GET('/jobs');
 
@@ -249,7 +250,7 @@ describe('API Client Error Handling Middleware', () => {
       it('should throw NetworkError for timeout', async () => {
         const timeoutError = new TypeError('fetch failed: ETIMEDOUT');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(timeoutError);
+        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(timeoutError).persist();
 
         const reqPromise = apiClient.GET('/jobs');
 
@@ -260,7 +261,7 @@ describe('API Client Error Handling Middleware', () => {
       it('should throw NetworkError for DNS resolution failure', async () => {
         const dnsError = new TypeError('fetch failed: ENOTFOUND');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(dnsError);
+        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(dnsError).persist();
 
         const reqPromise = apiClient.GET('/jobs');
 
@@ -271,7 +272,7 @@ describe('API Client Error Handling Middleware', () => {
       it('should throw NetworkError for host unreachable', async () => {
         const hostError = new TypeError('fetch failed: EHOSTUNREACH');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(hostError);
+        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(hostError).persist();
 
         const reqPromise = apiClient.GET('/jobs');
 
@@ -282,7 +283,7 @@ describe('API Client Error Handling Middleware', () => {
       it('should throw NetworkError for SSL/TLS errors', async () => {
         const sslError = new TypeError('fetch failed: SSL certificate error');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(sslError);
+        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(sslError).persist();
 
         const reqPromise = apiClient.GET('/jobs');
 
@@ -293,7 +294,7 @@ describe('API Client Error Handling Middleware', () => {
       it('should throw NetworkError for AbortError', async () => {
         const abortError = new DOMException('This operation was aborted', 'AbortError');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(abortError);
+        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(abortError).persist();
 
         const reqPromise = apiClient.GET('/jobs');
 

@@ -19,7 +19,6 @@ import { ErrorContext, extractResourceInfo, parseErrorResponse } from './common'
  */
 const handleHttpResponseError = async (response: Response, context: ErrorContext): Promise<never> => {
   const { url, method } = context;
-  console.log('Handling HTTP response error', { url, method, status: response.status });
   const statusCode = response.status;
   const errorMessage = await parseErrorResponse(response, context);
 
@@ -70,8 +69,6 @@ export function createResponseMiddleware(): Exclude<Middleware['onResponse'], un
     };
 
     if (!response.ok) {
-      console.log('not ok');
-
       // If response is not OK, handle it as an error
       await handleHttpResponseError(response, context);
     }
