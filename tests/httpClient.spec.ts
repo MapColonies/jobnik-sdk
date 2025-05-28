@@ -2,6 +2,7 @@
 /**
  * @fileoverview Tests for httpClient using undici MockAgent and jest.
  */
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MockAgent, MockPool } from 'undici';
 import { createRetryAgent } from '../src/network/httpClient';
 
@@ -12,14 +13,14 @@ declare global {
 }
 
 // Mock the Agent constructor from undici to use our MockAgent instance
-jest.mock('undici', () => {
+vi.mock('undici', async () => {
   // Store the actual implementation
-  const originalModule = jest.requireActual('undici');
+  const originalModule = await vi.importActual('undici');
 
   return {
     ...originalModule,
     // Mock agent constructor to return our mockAgent
-    Agent: jest.fn().mockImplementation(() => {
+    Agent: vi.fn().mockImplementation(() => {
       // We'll set this in the test
       return global.mockAgentForTest;
     }),
