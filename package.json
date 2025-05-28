@@ -1,16 +1,26 @@
 {
-  "name": "@map-colonies/ts-npm-package-boilerplate",
-  "version": "1.0.3",
-  "description": "This is template for map colonies typescript packages",
+  "name": "@map-colonies/jobnik-sdk",
+  "version": "1.0.0",
+  "description": "Map Colonies Jobnik SDK",
   "main": "./dist/index.js",
   "exports": {
     ".": {
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./api": {
+      "require": "./dist/api/index.js",
+      "types": "./dist/api/index.d.ts"
+    },
+    "./types": {
+      "require": "./dist/types/index.js",
+      "types": "./dist/types/index.d.ts"
     }
   },
   "scripts": {
-    "test": "tsc --noEmit -p tsconfig.json && jest --config=./tests/configurations/jest.config.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "prelint:fix": "npm run format:fix",
@@ -21,6 +31,7 @@
     "build": "tsc --project tsconfig.build.json",
     "start": "npm run build && cd dist && node ./index.js",
     "clean": "rimraf dist",
+    "generate:types": "npx @map-colonies/openapi-helpers openapi3.yaml src/types/openapi.ts --format --add-typed-request-handler",
     "prepack": "npm run build",
     "prepare": "husky"
   },
@@ -47,22 +58,28 @@
     "@commitlint/cli": "^19.8.0",
     "@map-colonies/commitlint-config": "^1.1.1",
     "@map-colonies/eslint-config": "^6.0.0",
+    "@map-colonies/openapi-helpers": "^2.0.0",
     "@map-colonies/prettier-config": "^0.0.1",
     "@map-colonies/tsconfig": "^1.0.1",
-    "@swc/core": "^1.11.11",
-    "@swc/jest": "^0.2.37",
-    "@types/jest": "^29.5.14",
     "@types/node": "^22.13.11",
+    "@vitest/coverage-v8": "^3.1.4",
+    "@vitest/ui": "^3.1.4",
     "commitlint": "^19.8.0",
     "eslint": "^9.23.0",
-    "eslint-plugin-jest": "^28.11.0",
     "husky": "^9.1.7",
-    "jest": "^29.7.0",
-    "jest-html-reporters": "^3.1.7",
+    "openapi-typescript": "^7.8.0",
     "prettier": "^3.5.3",
     "pretty-quick": "^4.1.1",
+    "rimraf": "^6.0.1",
     "typedoc": "^0.28.1",
     "typescript": "^5.8.2",
-    "rimraf": "^6.0.1"
+    "vitest": "^3.1.4"
+  },
+  "dependencies": {
+    "@map-colonies/read-pkg": "^1.0.0",
+    "@opentelemetry/api": "^1.9.0",
+    "http-status-codes": "^2.3.0",
+    "openapi-fetch": "^0.14.0",
+    "undici": "^6.21.3"
   }
 }
