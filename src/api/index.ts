@@ -1,8 +1,7 @@
-import { trace } from '@opentelemetry/api';
 import createClient, { type Client } from 'openapi-fetch';
 import type { paths } from '../types';
 import { createRetryAgent, HttpClientOptions } from '../network/httpClient';
-import { tracer } from '../telemetry/trace';
+import { wrapClient } from './wrapper';
 import { createErrorHandlingMiddleware } from './middlewares/error';
 import { createResponseMiddleware } from './middlewares/response';
 
@@ -28,20 +27,5 @@ export function createApiClient(baseUrl: string, httpClientOptions: HttpClientOp
     },
   });
 
-  const originalRequest = client.request.bind(client);
-  //@ts-expect-error
-  client.request = async (method, path, init) => {
-    // Custom request handling logic can be added here if needed
-    // const b = originalRequest(method, path, init);
-    await tracer.startActiveSpan(`API Request: ${method.toUpperCase()} ${path}`, async () => {
-      console.log(`Making request: ${method.toUpperCase()} ${path}`, init);
-      return originalRequest(method, path, init);
-    });
-    console.log(`Making request: ${method.toUpperCase()} ${path}`, init);
-    //@ts-expect-error
-  };
-
-  // void client.request('get', '/jobs', {});
-
-  return client;
+  return wrapClient(client);
 }

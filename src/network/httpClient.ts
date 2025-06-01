@@ -1,5 +1,6 @@
 import { Agent, Dispatcher, RetryAgent } from 'undici';
 import { StatusCodes } from 'http-status-codes';
+import { trace } from '@opentelemetry/api';
 import type { Logger } from '../telemetry/logger';
 import { NoopLogger } from '../telemetry/noopLogger';
 
@@ -138,6 +139,10 @@ export function createRetryAgent(options: HttpClientOptions = {}): Dispatcher {
     errorCodes: retryOptions.errorCodes ?? DEFAULT_RETRY_ERROR_CODES,
     retry: (err: Error, context, cb: (err?: Error | null) => void): void => {
       // Extract attempt number from context.state.counter (undici RetryHandler pattern)
+
+      const span = trace.getActiveSpan();
+      span?.setAttribute('http.request.resend_count', context.state.counter);
+
       const attempt = context.state.counter;
       const maxRetries = retryOptions.maxRetries ?? DEFAULT_MAX_RETRIES;
       const isMaxed = attempt > maxRetries;
