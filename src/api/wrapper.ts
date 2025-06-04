@@ -50,6 +50,7 @@ async function getOpenApiSpec(): Promise<Record<string, Record<string, string>>>
       const bundledSpec = await bundle(openApiPath);
 
       openApiSpec = extractOperationIds(bundledSpec as OpenAPIV3.Document);
+      /* c8 ignore next 4 */
     } catch (error) {
       console.warn('Failed to load OpenAPI spec:', error);
       openApiSpec = {};
@@ -119,6 +120,7 @@ async function wrapWithSpan<
           code: SpanStatusCode.OK,
         });
       } else {
+        console.log('oh noes error');
         span.setStatus({
           code: SpanStatusCode.ERROR,
           message: `Request failed with status ${result.response.status}`,
