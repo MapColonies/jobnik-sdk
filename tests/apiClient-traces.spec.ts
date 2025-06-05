@@ -92,12 +92,54 @@ describe('apiClient tracing', () => {
     expect(spans[0]).toHaveProperty(['attributes', 'api.operation_id'], 'findJobs');
   });
 
+  it('should create a span for the API call when using the request method', async () => {
+    expect.assertions(1);
+    mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(200, []);
+    await tracer.startActiveSpan('Test Span', async (span) => {
+      await apiClient.request('get', '/jobs');
+      span.end();
+    });
+    const spans = memoryExporter.getFinishedSpans();
+    expect(spans[0]).toHaveProperty('name', 'API Request: GET /jobs');
+  });
+
+  it.for([
+    { method: 'GET' as const, path: '/jobs', expectedName: 'API Request: GET /jobs' },
+    { method: 'POST' as const, path: '/jobs', expectedName: 'API Request: POST /jobs' },
+    { method: 'PUT' as const, path: '/jobs/123', expectedName: 'API Request: PUT /jobs/123' },
+    { method: 'PATCH' as const, path: '/jobs/123', expectedName: 'API Request: PATCH /jobs/123' },
+    { method: 'DELETE' as const, path: '/jobs/123', expectedName: 'API Request: DELETE /jobs/123' },
+    { method: 'HEAD' as const, path: '/jobs/123', expectedName: 'API Request: HEAD /jobs/123' },
+    { method: 'OPTIONS' as const, path: '/jobs/123', expectedName: 'API Request: OPTIONS /jobs/123' },
+    { method: 'TRACE' as const, path: '/jobs/123', expectedName: 'API Request: TRACE /jobs/123' },
+  ])('should create a span for $method requests with 400 response', async ({ method, path, expectedName }) => {
+    expect.assertions(2);
+
+    mockPool.intercept({ path, method }).reply(400, 'Bad Request');
+
+    await tracer.startActiveSpan('Test Span', async (span) => {
+      try {
+        // @ts-expect-error we loop over all the methods, but typescript doesnt understand the keys
+        await apiClient[method](path, !['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method) ? { body: {} } : undefined);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (err) {
+        // Catch the error to prevent it from failing the test
+      }
+      span.end();
+    });
+
+    const spans = memoryExporter.getFinishedSpans();
+    expect(spans[0]).toHaveProperty('name', expectedName);
+    expect(spans[0]).toHaveProperty('status.code', api.SpanStatusCode.ERROR);
+  });
+
   it('should set the span status to ERROR on 4xx response', async () => {
     expect.assertions(1);
     mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(400, 'BadRequest');
     await tracer.startActiveSpan('Test Span', async (span) => {
       try {
         await apiClient.GET('/jobs');
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
         // Catch the error to prevent it from failing the test
       }
@@ -117,6 +159,7 @@ describe('apiClient tracing', () => {
     await tracer.startActiveSpan('Test Span', async (span) => {
       try {
         await apiClient.GET('/jobs');
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
         // Catch the error to prevent it from failing the test
       }

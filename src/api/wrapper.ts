@@ -115,17 +115,10 @@ async function wrapWithSpan<
 
       //@ts-expect-error im not sure why typescript hates me here (╯°□°）╯︵ ┻━┻
       const result = await request(method, path, ...init);
-      if (result.response.ok) {
-        span.setStatus({
-          code: SpanStatusCode.OK,
-        });
-      } else {
-        console.log('oh noes error');
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: `Request failed with status ${result.response.status}`,
-        });
-      }
+      span.setStatus({
+        code: SpanStatusCode.OK,
+      });
+
       return result;
     } catch (error) {
       span.setStatus({
