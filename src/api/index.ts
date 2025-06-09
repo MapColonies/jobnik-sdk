@@ -9,7 +9,9 @@ type Prettify<T> = {
   [K in keyof T]: T[K];
 } & {};
 
-export function createApiClient(baseUrl: string, httpClientOptions: HttpClientOptions = {}): Prettify<Client<paths>> {
+export type ApiClient = Prettify<Client<paths>>;
+
+export function createApiClient(baseUrl: string, httpClientOptions: HttpClientOptions = {}): ApiClient {
   const client = createClient<paths>({
     baseUrl,
 
