@@ -1,6 +1,7 @@
 import createClient, { type Client } from 'openapi-fetch';
 import type { paths } from '../types';
 import { createRetryAgent, HttpClientOptions } from '../network/httpClient';
+import { wrapClient } from './wrapper';
 import { createErrorHandlingMiddleware } from './middlewares/error';
 import { createResponseMiddleware } from './middlewares/response';
 
@@ -25,5 +26,6 @@ export function createApiClient(baseUrl: string, httpClientOptions: HttpClientOp
       // Request handling logic can be added here if needed
     },
   });
-  return client;
+
+  return wrapClient(client);
 }
