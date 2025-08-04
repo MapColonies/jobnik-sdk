@@ -224,3 +224,16 @@ export class GatewayTimeoutError extends JobProcessingError {
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
+
+export class ValidationError extends Error {
+  public readonly code = 'VALIDATION_ERROR';
+  /**
+   * Creates an instance of ValidationError.
+   * @param message - The error message.
+   * @param cause - Optional original error or server response data.
+   */
+  public constructor(message: string, cause?: unknown) {
+    super(message, { cause });
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import type { TypedRequestHandlers as ImportedTypedRequestHandlers } from '@map-colonies/openapi-helpers/typedRequestHandler';
+import type { JobId, StageId, TaskId } from './brands';
 export type paths = {
   '/jobs': {
     parameters: {
@@ -11,7 +11,7 @@ export type paths = {
     /**
      * Retrieve jobs matching specified criteria
      * @description Returns a filtered list of jobs based on the provided query parameters.
-     *     Supports filtering by job mode, name, date range, priority, and creator.
+     *     Supports filtering by job mode, name, date range, priority.
      *     Optional inclusion of related stage data via the should_return_stages parameter.
      *
      *     Returns an empty array ([]) when no jobs match the specified criteria, rather than an error.
@@ -20,15 +20,11 @@ export type paths = {
     get: operations['findJobs'];
     put?: never;
     /**
-     * Create a new job with optional stages
-     * @description Creates a new job in the system with user-defined configuration.
-     *     Supports both pre-defined and dynamic job modes, with customizable priorities,
-     *     expiration settings, and notification hooks.
+     * Create a new job with configuration and metadata
+     * @description Creates a new job in the system with user-defined configuration and metadata.
+     *     Supports customizable priorities and job-specific data payloads.
      *
-     *     Pre-defined jobs require all stages to be defined at creation time, while
-     *     dynamic jobs allow stages to be added later via the /jobs/{jobId}/stage endpoint.
-     *
-     *     The job will be created with an initial default status of PENDING and can be tracked
+     *     The job will be created with an initial status of CREATED and can be tracked
      *     throughout its lifecycle using the returned job ID.
      *
      */
@@ -205,15 +201,13 @@ export type paths = {
     get?: never;
     put?: never;
     /**
-     * Add a new stage to a dynamic job
-     * @description Appends a new stage to an existing job that has DYNAMIC job mode.
+     * Add a new stage to a job
+     * @description Appends a new stage to an existing job.
      *     The stage will be added after any existing stages in the job's workflow sequence.
      *
      *     This endpoint allows for extending job workflows at runtime by adding new processing steps.
-     *     Optionally, tasks can be defined within the new stage during creation.
      *
      *     The job must exist and be in a valid state to accept new stages.
-     *     Only jobs with DYNAMIC mode can have stages added after creation.
      *
      */
     post: operations['addStage'];
@@ -394,19 +388,48 @@ export type paths = {
     patch?: never;
     trace?: never;
   };
+  '/stages/{stageType}/tasks/dequeue': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Stage type identifier for dequeuing tasks */
+        stageType: components['parameters']['stageType'];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Find and claim the highest priority pending task of specified stage type
+     * @description Retrieves the highest priority task of the specified stage type that is in PENDING or RETRIED status,
+     *     and automatically updates its status to IN_PROGRESS. This endpoint implements a priority-based
+     *     work queue pattern where workers can claim the next available task.
+     *
+     *     The endpoint considers task priority (inherited from the parent job), searches only for tasks
+     *     that are in valid states (PENDING or RETRIED), and updates related stage and job status if needed.
+     *
+     *     If successful, returns the complete task details with status updated to IN_PROGRESS.
+     *
+     */
+    patch: operations['dequeueTask'];
+    trace?: never;
+  };
   '/tasks': {
     parameters: {
       query?: {
         /** @description Filter results by stage identifier */
         stage_id?: components['parameters']['paramStageId'];
-        /** @description Filter results by task type.
-         *     Used to find tasks designed for specific operations (e.g., TILE_RENDERING).
-         *      */
-        task_type?: components['parameters']['paramTaskType'];
+        /** @description Filter results by stage identifier */
+        stage_type?: components['parameters']['paramStageType'];
         /** @description Filter results by update time, starting from this date/time */
         from_date?: components['parameters']['fromDate'];
         /** @description Filter results by update time, ending at this date/time */
-        till_date?: components['parameters']['tillDate'];
+        end_date?: components['parameters']['endDate'];
         /** @description Filter tasks by their operational status */
         status?: components['parameters']['paramsTaskStatus'];
       };
@@ -515,37 +538,6 @@ export type paths = {
     patch?: never;
     trace?: never;
   };
-  '/tasks/{taskType}/dequeue': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description Type of the requested task */
-        taskType: components['parameters']['taskType'];
-      };
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /**
-     * Find and claim the highest priority pending task of specified type
-     * @description Retrieves the highest priority task of the specified type that is in PENDING or RETRIED status,
-     *     and automatically updates its status to IN_PROGRESS. This endpoint implements a priority-based
-     *     work queue pattern where workers can claim the next available task.
-     *
-     *     The endpoint considers task priority (inherited from the parent job), searches only for tasks
-     *     that are in valid states (PENDING or RETRIED), and updates related stage and job status if needed.
-     *
-     *     If successful, returns the complete task details with status updated to IN_PROGRESS.
-     *
-     */
-    patch: operations['dequeueTask'];
-    trace?: never;
-  };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -561,20 +553,10 @@ export type components = {
      */
     updateTime: string;
     /**
-     * Format: date-time
-     * @description Optional timestamp indicating when the job will expire if not completed
-     */
-    expirationTime: string | null;
-    /**
-     * Format: date-time
-     * @description Optional timestamp indicating when the job will be automatically deleted
-     */
-    ttl: string | null;
-    /**
      * Format: uuid
      * @description Unique identifier for a job
      */
-    jobId: string;
+    jobId: JobId;
     /** @description Custom job configuration data containing job-specific parameters */
     jobPayload: {
       [key: string]: unknown;
@@ -589,13 +571,11 @@ export type components = {
      * Format: uuid
      * @description Unique identifier for a stage
      */
-    stageId: string;
+    stageId: StageId;
     /** @description Custom stage configuration data containing stage-specific parameters */
     stagePayload: {
       [key: string]: unknown;
     };
-    /** @description Configuration for notification channels and triggers */
-    notifications: Record<string, never>;
     /**
      * @description Relative importance of the job, affecting processing order
      * @example LOW
@@ -609,10 +589,13 @@ export type components = {
      */
     successMessages: 'JOB_MODIFIED_SUCCESSFULLY' | 'TASK_MODIFIED_SUCCESSFULLY' | 'STAGE_MODIFIED_SUCCESSFULLY' | 'JOB_DELETED_SUCCESSFULLY';
     /**
-     * @description Source or organization responsible for creating the job
+     * @description Execution state of a stage within a job's workflow, tracking progress through its lifecycle.
+     *     Finite states from which no further transitions are possible include: COMPLETED, FAILED, and ABORTED.
+     *
+     * @example CREATED
      * @enum {string}
      */
-    creator: 'MAP_COLONIES' | 'UNKNOWN';
+    jobOperationStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABORTED' | 'PAUSED' | 'CREATED';
     /**
      * @description Execution state of a stage within a job's workflow, tracking progress through its lifecycle.
      *     Finite states from which no further transitions are possible include: COMPLETED, FAILED, and ABORTED.
@@ -620,35 +603,28 @@ export type components = {
      * @example CREATED
      * @enum {string}
      */
-    jobOperationStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABORTED' | 'PAUSED' | 'WAITING' | 'CREATED';
-    /**
-     * @description Execution state of a stage within a job's workflow, tracking progress through its lifecycle.
-     *     Finite states from which no further transitions are possible include: COMPLETED, FAILED, and ABORTED.
-     *
-     * @example CREATED
-     * @enum {string}
-     */
-    stageOperationStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABORTED' | 'PAUSED' | 'WAITING' | 'CREATED';
+    stageOperationStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABORTED' | 'WAITING' | 'CREATED';
     /**
      * @description Current operational state of a task, including specialized states like RETRIED for task-specific error handling.
-     *     Finite states from which no further transitions are possible include: COMPLETED, FAILED, and ABORTED.
+     *     Finite states from which no further transitions are possible include: COMPLETED and FAILED.
      *
      * @example CREATED
      * @enum {string}
      */
-    taskOperationStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABORTED' | 'PAUSED' | 'CREATED' | 'RETRIED';
-    /**
-     * @description Job creation mode determining whether all stages must be defined at creation (PRE_DEFINED) or can be added later (DYNAMIC)
-     * @example PRE_DEFINED
-     * @enum {string}
-     */
-    jobMode: 'PRE_DEFINED' | 'DYNAMIC';
+    taskOperationStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CREATED' | 'RETRIED';
     /**
      * @description Category or type of job processing being performed, used for filtering and system behaviors
      * @example DEFAULT
-     * @enum {string}
      */
-    jobName: 'INGESTION' | 'EXPORT' | 'DEFAULT';
+    jobName: string;
+    /**
+     * @description Free-form string identifier for stage functionality, allowing flexible categorization
+     *     of stage operations. Used for routing tasks to appropriate workers and
+     *     for filtering in API requests. Can be any descriptive name up to 50 characters.
+     *
+     * @example unknown
+     */
+    stageType: string;
     /** @description Flag indicating whether to include complete stage details in job response payloads */
     returnStage: boolean;
     /** @description Flag indicating whether to include complete task details in stage response payloads */
@@ -670,10 +646,6 @@ export type components = {
       completed: number;
       /** @description Number of tasks that encountered errors and could not be completed */
       failed: number;
-      /** @description Number of tasks manually stopped before completion */
-      aborted: number;
-      /** @description Number of tasks temporarily suspended from execution */
-      paused: number;
       /** @description Number of tasks in initial state before becoming pending */
       created: number;
       /** @description Number of tasks scheduled for re-execution after failure */
@@ -683,45 +655,40 @@ export type components = {
     };
     /** @description Input payload for creating a new job in the system.
      *     Contains all required configuration for job execution, including processing mode,
-     *     custom parameters, metadata, and optionally pre-defined stages.
+     *     custom parameters, metadata.
      *      */
     createJobPayload: {
-      jobMode: components['schemas']['jobMode'];
-      name?: components['schemas']['jobName'];
-      data: components['schemas']['jobPayload'];
-      priority?: components['schemas']['priority'];
-      expirationTime?: components['schemas']['expirationTime'];
-      ttl?: components['schemas']['ttl'];
-      notifications: components['schemas']['notifications'];
-      userMetadata: components['schemas']['userMetadata'];
-      creator: components['schemas']['creator'];
-      /** @description Optional array of stages to create with the job (required for PRE_DEFINED jobs) */
-      stages?: components['schemas']['createStagePayload'][];
-    };
-    /** @description job Response model */
-    jobResponse: {
-      id: components['schemas']['jobId'];
-      status?: components['schemas']['jobOperationStatus'];
-      percentage?: components['schemas']['percentage'];
-      creationTime?: components['schemas']['creationTime'];
-      updateTime?: components['schemas']['updateTime'];
-      jobMode: components['schemas']['jobMode'];
       name: components['schemas']['jobName'];
       data: components['schemas']['jobPayload'];
       priority?: components['schemas']['priority'];
-      expirationTime?: components['schemas']['expirationTime'];
-      ttl?: components['schemas']['ttl'];
-      notifications: components['schemas']['notifications'];
       userMetadata: components['schemas']['userMetadata'];
-      creator: components['schemas']['creator'];
-      stages?: components['schemas']['stageResponse'][];
     };
-    /** @description Input payload for creating a new processing stage.
-     *     Defines the stage type, custom configuration data, and user-defined metadata.
-     *     Used when adding stages to jobs or creating stages as part of job creation.
-     *      */
+    /** @description job Response model */
+    job: {
+      readonly id: components['schemas']['jobId'];
+      readonly status: components['schemas']['jobOperationStatus'];
+      readonly percentage: components['schemas']['percentage'];
+      readonly creationTime: components['schemas']['creationTime'];
+      readonly updateTime: components['schemas']['updateTime'];
+      name: components['schemas']['jobName'];
+      data: components['schemas']['jobPayload'];
+      priority: components['schemas']['priority'];
+      userMetadata: components['schemas']['userMetadata'];
+      readonly stages?: components['schemas']['stageResponse'][];
+    };
+    createStagePayloadRequest: components['schemas']['createStagePayload'] & {
+      /**
+       * @description Optional flag indicating whether the stage should be created in a waiting state.
+       *     If true, the stage will not start processing immediately and will require
+       *     manual intervention to begin execution. Useful for staging workflows where
+       *     stages need to be prepared but not executed until all dependencies are met.
+       *
+       * @example false
+       */
+      startAsWaiting?: boolean;
+    };
     createStagePayload: {
-      type: components['schemas']['taskType'];
+      type: components['schemas']['stageType'];
       data: components['schemas']['stagePayload'];
       userMetadata: components['schemas']['userMetadata'];
     };
@@ -740,16 +707,7 @@ export type components = {
      * Format: uuid
      * @description Unique identifier for a task, generated by the system upon task creation
      */
-    taskId: string;
-    /**
-     * @description Categorization of task functionality, determining the specific operation
-     *     to be performed. Used for routing tasks to appropriate workers and
-     *     for filtering in API requests.
-     *
-     * @example DEFAULT
-     * @enum {string}
-     */
-    taskType: 'TILE_SEEDING' | 'TILE_RENDERING' | 'PUBLISH_CATALOG' | 'PUBLISH_LAYER' | 'DEFAULT';
+    taskId: TaskId;
     /** @description Custom task configuration data containing operation-specific parameters.
      *     The schema varies based on task type and contains all necessary information
      *     for task execution by workers.
@@ -757,15 +715,11 @@ export type components = {
     taskPayload: {
       [key: string]: unknown;
     };
-    createStageWithTasksPayload: components['schemas']['createStagePayload'] & {
-      tasks?: components['schemas']['createTaskPayload'][];
-    };
     /** @description Input payload for creating a new task within a stage.
      *     Contains task type, operational parameters, and optional retry configuration.
      *     Used when adding tasks to existing stages.
      *      */
     createTaskPayload: {
-      type: components['schemas']['taskType'];
       data: components['schemas']['taskPayload'];
       userMetadata?: components['schemas']['userMetadata'];
       maxAttempts?: components['schemas']['maxAttempts'];
@@ -776,7 +730,6 @@ export type components = {
      *      */
     taskResponse: {
       id: components['schemas']['taskId'];
-      type: components['schemas']['taskType'];
       data: components['schemas']['taskPayload'];
       stageId: components['schemas']['stageId'];
       userMetadata?: components['schemas']['userMetadata'];
@@ -785,26 +738,6 @@ export type components = {
       status: components['schemas']['taskOperationStatus'];
       attempts: components['schemas']['attempts'];
       maxAttempts: components['schemas']['maxAttempts'];
-    };
-    /** @description Response returned after successful job creation, containing the complete
-     *     job details including the generated job ID and initial status information.
-     *      */
-    createJobResponse: {
-      id: components['schemas']['jobId'];
-      data?: components['schemas']['jobPayload'];
-      status?: components['schemas']['jobOperationStatus'];
-      percentage?: components['schemas']['percentage'];
-      creationTime?: components['schemas']['creationTime'];
-      updateTime?: components['schemas']['updateTime'];
-      expirationTime?: components['schemas']['expirationTime'];
-      jobMode?: components['schemas']['jobMode'];
-      userMetadata?: components['schemas']['userMetadata'];
-      priority?: components['schemas']['priority'];
-      creator?: components['schemas']['creator'];
-      ttl?: components['schemas']['ttl'];
-      notifications?: components['schemas']['notifications'];
-      name?: components['schemas']['jobName'];
-      stages?: components['schemas']['stageResponse'][];
     };
     /** @description Standard error response structure used when API operations encounter problems.
      *     Contains a human-readable message and optional stack trace for debugging.
@@ -839,22 +772,16 @@ export type components = {
     stageId: components['schemas']['stageId'];
     /** @description Unique identifier for the task */
     taskId: string;
-    /** @description Type of the requested task */
-    taskType: components['schemas']['taskType'];
     /** @description Filter tasks by their operational status */
     paramsTaskStatus: components['schemas']['taskOperationStatus'];
-    /** @description Filter jobs by their mode (PRE_DEFINED or DYNAMIC) */
-    jobModeQueryParam: components['schemas']['jobMode'];
     /** @description Filter jobs by their name/type */
     jobNameQueryParam: components['schemas']['jobName'];
     /** @description Filter jobs by their priority level */
     priority: components['schemas']['priority'];
-    /** @description Filter jobs by their creator */
-    creator: components['schemas']['creator'];
     /** @description Filter results by update time, starting from this date/time */
     fromDate: string;
     /** @description Filter results by update time, ending at this date/time */
-    tillDate: string;
+    endDate: string;
     /** @description When true, includes stage data in the response */
     includeStages: components['schemas']['returnStage'];
     /** @description When true, includes task data in the response */
@@ -864,15 +791,13 @@ export type components = {
     /** @description Filter results by job identifier */
     paramJobId: components['schemas']['jobId'];
     /** @description Filter results by stage identifier */
-    paramStageType: components['schemas']['taskType'];
+    paramStageType: components['schemas']['stageType'];
+    /** @description Stage type identifier for dequeuing tasks */
+    stageType: components['schemas']['stageType'];
     /** @description Filter results by stage operational status (e.g., PENDING, IN_PROGRESS).
      *     Used to find stages in specific execution states.
      *      */
     stageStatus: components['schemas']['stageOperationStatus'];
-    /** @description Filter results by task type.
-     *     Used to find tasks designed for specific operations (e.g., TILE_RENDERING).
-     *      */
-    paramTaskType: components['schemas']['taskType'];
   };
   requestBodies: never;
   headers: never;
@@ -883,18 +808,14 @@ export interface operations {
   findJobs: {
     parameters: {
       query?: {
-        /** @description Filter jobs by their mode (PRE_DEFINED or DYNAMIC) */
-        job_mode?: components['parameters']['jobModeQueryParam'];
         /** @description Filter jobs by their name/type */
         job_name?: components['parameters']['jobNameQueryParam'];
         /** @description Filter results by update time, starting from this date/time */
         from_date?: components['parameters']['fromDate'];
         /** @description Filter results by update time, ending at this date/time */
-        till_date?: components['parameters']['tillDate'];
+        end_date?: components['parameters']['endDate'];
         /** @description Filter jobs by their priority level */
         priority?: components['parameters']['priority'];
-        /** @description Filter jobs by their creator */
-        creator?: components['parameters']['creator'];
         /** @description When true, includes stage data in the response */
         should_return_stages?: components['parameters']['includeStages'];
       };
@@ -910,7 +831,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['jobResponse'][];
+          'application/json': components['schemas']['job'][];
         };
       };
       /** @description Invalid query parameters */
@@ -952,7 +873,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['createJobResponse'];
+          'application/json': components['schemas']['job'];
         };
       };
       /** @description Invalid request, could not create job */
@@ -996,7 +917,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['jobResponse'];
+          'application/json': components['schemas']['job'];
         };
       };
       /** @description Invalid request, could not get job */
@@ -1052,7 +973,7 @@ export interface operations {
           'application/json': components['schemas']['defaultOkMessage'];
         };
       };
-      /** @description Bad parameters input */
+      /** @description Invalid parameters or validation error */
       400: {
         headers: {
           [name: string]: unknown;
@@ -1330,7 +1251,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        'application/json': components['schemas']['createStageWithTasksPayload'];
+        'application/json': components['schemas']['createStagePayloadRequest'];
       };
     };
     responses: {
@@ -1343,7 +1264,7 @@ export interface operations {
           'application/json': components['schemas']['stageResponse'];
         };
       };
-      /** @description Invalid request format or job not in DYNAMIC mode */
+      /** @description Invalid request format. */
       400: {
         headers: {
           [name: string]: unknown;
@@ -1744,19 +1665,67 @@ export interface operations {
       };
     };
   };
+  dequeueTask: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Stage type identifier for dequeuing tasks */
+        stageType: components['parameters']['stageType'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Task successfully dequeued and status updated to IN_PROGRESS */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['taskResponse'];
+        };
+      };
+      /** @description Invalid stageType parameter or other validation error */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['errorMessage'];
+        };
+      };
+      /** @description No pending tasks of requested type are available */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['errorMessage'];
+        };
+      };
+      /** @description Internal server error or invalid state transition */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['errorMessage'];
+        };
+      };
+    };
+  };
   getTasksByCriteria: {
     parameters: {
       query?: {
         /** @description Filter results by stage identifier */
         stage_id?: components['parameters']['paramStageId'];
-        /** @description Filter results by task type.
-         *     Used to find tasks designed for specific operations (e.g., TILE_RENDERING).
-         *      */
-        task_type?: components['parameters']['paramTaskType'];
+        /** @description Filter results by stage identifier */
+        stage_type?: components['parameters']['paramStageType'];
         /** @description Filter results by update time, starting from this date/time */
         from_date?: components['parameters']['fromDate'];
         /** @description Filter results by update time, ending at this date/time */
-        till_date?: components['parameters']['tillDate'];
+        end_date?: components['parameters']['endDate'];
         /** @description Filter tasks by their operational status */
         status?: components['parameters']['paramsTaskStatus'];
       };
@@ -1967,55 +1936,4 @@ export interface operations {
       };
     };
   };
-  dequeueTask: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description Type of the requested task */
-        taskType: components['parameters']['taskType'];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Task successfully dequeued and status updated to IN_PROGRESS */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['taskResponse'];
-        };
-      };
-      /** @description Bad taskType parameter or other validation error */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['errorMessage'];
-        };
-      };
-      /** @description No pending tasks of requested type are available */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['errorMessage'];
-        };
-      };
-      /** @description Internal server error or invalid state transition */
-      500: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['errorMessage'];
-        };
-      };
-    };
-  };
 }
-export type TypedRequestHandlers = ImportedTypedRequestHandlers<paths, operations>;

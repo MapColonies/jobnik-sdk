@@ -3,7 +3,7 @@ import type { paths } from '../types';
 import { createRetryAgent, HttpClientOptions } from '../network/httpClient';
 import { wrapClient } from './wrapper';
 import { createErrorHandlingMiddleware } from './middlewares/error';
-import { createResponseMiddleware } from './middlewares/response';
+// import { createResponseMiddleware } from './middlewares/response';
 
 type Prettify<T> = {
   [K in keyof T]: T[K];
@@ -23,7 +23,7 @@ export function createApiClient(baseUrl: string, httpClientOptions: HttpClientOp
 
   client.use({
     onError: createErrorHandlingMiddleware(),
-    onResponse: createResponseMiddleware(),
+    // onResponse: createResponseMiddleware(),
     async onRequest() {
       // Request handling logic can be added here if needed
     },

@@ -11,17 +11,15 @@ paths:
     get:
       operationId: findJobs
       parameters:
-        - $ref: '#/components/parameters/jobModeQueryParam'
         - $ref: '#/components/parameters/jobNameQueryParam'
         - $ref: '#/components/parameters/fromDate'
-        - $ref: '#/components/parameters/tillDate'
+        - $ref: '#/components/parameters/endDate'
         - $ref: '#/components/parameters/priority'
-        - $ref: '#/components/parameters/creator'
         - $ref: '#/components/parameters/includeStages'
       summary: Retrieve jobs matching specified criteria
       description: |
         Returns a filtered list of jobs based on the provided query parameters.
-        Supports filtering by job mode, name, date range, priority, and creator.
+        Supports filtering by job mode, name, date range, priority.
         Optional inclusion of related stage data via the should_return_stages parameter.
 
         Returns an empty array ([]) when no jobs match the specified criteria, rather than an error.
@@ -35,7 +33,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/jobResponse'
+                  $ref: '#/components/schemas/job'
         '400':
           description: Invalid query parameters
           content:
@@ -50,16 +48,12 @@ paths:
                 $ref: '#/components/schemas/errorMessage'
     post:
       operationId: createJob
-      summary: Create a new job with optional stages
+      summary: Create a new job with configuration and metadata
       description: |
-        Creates a new job in the system with user-defined configuration.
-        Supports both pre-defined and dynamic job modes, with customizable priorities,
-        expiration settings, and notification hooks.
+        Creates a new job in the system with user-defined configuration and metadata.
+        Supports customizable priorities and job-specific data payloads.
 
-        Pre-defined jobs require all stages to be defined at creation time, while
-        dynamic jobs allow stages to be added later via the /jobs/{jobId}/stage endpoint.
-
-        The job will be created with an initial default status of PENDING and can be tracked
+        The job will be created with an initial status of CREATED and can be tracked
         throughout its lifecycle using the returned job ID.
       tags:
         - jobs
@@ -75,7 +69,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/createJobResponse'
+                $ref: '#/components/schemas/job'
         '400':
           description: Invalid request, could not create job
           content:
@@ -110,7 +104,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/jobResponse'
+                $ref: '#/components/schemas/job'
         '400':
           description: Invalid request, could not get job
           content:
@@ -153,7 +147,7 @@ paths:
               example:
                 code: JOB_DELETED_SUCCESSFULLY
         '400':
-          description: Bad parameters input
+          description: Invalid parameters or validation error
           content:
             application/json:
               schema:
@@ -382,16 +376,14 @@ paths:
   /jobs/{jobId}/stage:
     post:
       operationId: addStage
-      summary: Add a new stage to a dynamic job
+      summary: Add a new stage to a job
       description: |
-        Appends a new stage to an existing job that has DYNAMIC job mode.
+        Appends a new stage to an existing job.
         The stage will be added after any existing stages in the job's workflow sequence.
 
         This endpoint allows for extending job workflows at runtime by adding new processing steps.
-        Optionally, tasks can be defined within the new stage during creation.
 
         The job must exist and be in a valid state to accept new stages.
-        Only jobs with DYNAMIC mode can have stages added after creation.
       parameters:
         - $ref: '#/components/parameters/jobId'
       tags:
@@ -401,7 +393,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/createStageWithTasksPayload'
+              $ref: '#/components/schemas/createStagePayloadRequest'
       responses:
         '201':
           description: Stage successfully created and added to the job
@@ -410,7 +402,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/stageResponse'
         '400':
-          description: Invalid request format or job not in DYNAMIC mode
+          description: Invalid request format.
           content:
             application/json:
               schema:
@@ -739,12 +731,54 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/errorMessage'
+  /stages/{stageType}/tasks/dequeue:
+    parameters:
+      - $ref: '#/components/parameters/stageType'
+    patch:
+      operationId: dequeueTask
+      summary: Find and claim the highest priority pending task of specified stage type
+      description: |
+        Retrieves the highest priority task of the specified stage type that is in PENDING or RETRIED status, 
+        and automatically updates its status to IN_PROGRESS. This endpoint implements a priority-based 
+        work queue pattern where workers can claim the next available task.
+
+        The endpoint considers task priority (inherited from the parent job), searches only for tasks 
+        that are in valid states (PENDING or RETRIED), and updates related stage and job status if needed.
+
+        If successful, returns the complete task details with status updated to IN_PROGRESS.
+      tags:
+        - stages
+      responses:
+        '200':
+          description: Task successfully dequeued and status updated to IN_PROGRESS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/taskResponse'
+        '400':
+          description: Invalid stageType parameter or other validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorMessage'
+        '404':
+          description: No pending tasks of requested type are available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorMessage'
+        '500':
+          description: Internal server error or invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorMessage'
   /tasks:
     parameters:
       - $ref: '#/components/parameters/paramStageId'
-      - $ref: '#/components/parameters/paramTaskType'
+      - $ref: '#/components/parameters/paramStageType'
       - $ref: '#/components/parameters/fromDate'
-      - $ref: '#/components/parameters/tillDate'
+      - $ref: '#/components/parameters/endDate'
       - $ref: '#/components/parameters/paramsTaskStatus'
     get:
       operationId: getTasksByCriteria
@@ -922,49 +956,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/errorMessage'
-  /tasks/{taskType}/dequeue:
-    parameters:
-      - $ref: '#/components/parameters/taskType'
-    patch:
-      operationId: dequeueTask
-      summary: Find and claim the highest priority pending task of specified type
-      description: |
-        Retrieves the highest priority task of the specified type that is in PENDING or RETRIED status, 
-        and automatically updates its status to IN_PROGRESS. This endpoint implements a priority-based 
-        work queue pattern where workers can claim the next available task.
-
-        The endpoint considers task priority (inherited from the parent job), searches only for tasks 
-        that are in valid states (PENDING or RETRIED), and updates related stage and job status if needed.
-
-        If successful, returns the complete task details with status updated to IN_PROGRESS.
-      tags:
-        - tasks
-      responses:
-        '200':
-          description: Task successfully dequeued and status updated to IN_PROGRESS
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/taskResponse'
-        '400':
-          description: Bad taskType parameter or other validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/errorMessage'
-        '404':
-          description: No pending tasks of requested type are available
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/errorMessage'
-        '500':
-          description: Internal server error or invalid state transition
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/errorMessage'
-
 security: []
 
 components:
@@ -990,13 +981,6 @@ components:
       required: true
       schema:
         type: string
-    taskType:
-      in: path
-      name: taskType
-      description: Type of the requested task
-      required: true
-      schema:
-        $ref: '#/components/schemas/taskType'
     paramsTaskStatus:
       in: query
       name: status
@@ -1004,13 +988,6 @@ components:
       required: false
       schema:
         $ref: '#/components/schemas/taskOperationStatus'
-    jobModeQueryParam:
-      in: query
-      name: job_mode
-      description: Filter jobs by their mode (PRE_DEFINED or DYNAMIC)
-      required: false
-      schema:
-        $ref: '#/components/schemas/jobMode'
     jobNameQueryParam:
       in: query
       name: job_name
@@ -1025,13 +1002,6 @@ components:
       required: false
       schema:
         $ref: '#/components/schemas/priority'
-    creator:
-      in: query
-      name: creator
-      description: Filter jobs by their creator
-      required: false
-      schema:
-        $ref: '#/components/schemas/creator'
     fromDate:
       in: query
       name: from_date
@@ -1040,9 +1010,9 @@ components:
       schema:
         type: string
         format: date-time
-    tillDate:
+    endDate:
       in: query
-      name: till_date
+      name: end_date
       description: Filter results by update time, ending at this date/time
       required: false
       schema:
@@ -1082,7 +1052,14 @@ components:
       description: Filter results by stage identifier
       required: false
       schema:
-        $ref: '#/components/schemas/taskType'
+        $ref: '#/components/schemas/stageType'
+    stageType:
+      in: path
+      name: stageType
+      description: Stage type identifier for dequeuing tasks
+      required: true
+      schema:
+        $ref: '#/components/schemas/stageType'
     stageStatus:
       in: query
       name: stage_operation_status
@@ -1092,15 +1069,6 @@ components:
       required: false
       schema:
         $ref: '#/components/schemas/stageOperationStatus'
-    paramTaskType:
-      in: query
-      name: task_type
-      description: |
-        Filter results by task type.
-        Used to find tasks designed for specific operations (e.g., TILE_RENDERING).
-      required: false
-      schema:
-        $ref: '#/components/schemas/taskType'
   schemas:
     creationTime:
       type: string
@@ -1110,16 +1078,6 @@ components:
       type: string
       format: date-time
       description: Timestamp indicating when the resource was last updated
-    expirationTime:
-      type: string
-      format: date-time
-      nullable: true
-      description: Optional timestamp indicating when the job will expire if not completed
-    ttl:
-      type: string
-      format: date-time
-      nullable: true
-      description: Optional timestamp indicating when the job will be automatically deleted
     jobId:
       type: string
       format: uuid
@@ -1147,9 +1105,6 @@ components:
       type: object
       additionalProperties: true
       description: Custom stage configuration data containing stage-specific parameters
-    notifications:
-      type: object
-      description: Configuration for notification channels and triggers
     priority:
       type: string
       enum:
@@ -1169,12 +1124,6 @@ components:
         - JOB_DELETED_SUCCESSFULLY
       example: JOB_MODIFIED_SUCCESSFULLY
       description: Standard success message codes used in API responses
-    creator:
-      type: string
-      enum:
-        - MAP_COLONIES
-        - UNKNOWN
-      description: Source or organization responsible for creating the job
     jobOperationStatus:
       type: string
       enum:
@@ -1184,7 +1133,6 @@ components:
         - FAILED
         - ABORTED
         - PAUSED
-        - WAITING
         - CREATED
       example: CREATED
       description: |
@@ -1198,7 +1146,6 @@ components:
         - COMPLETED
         - FAILED
         - ABORTED
-        - PAUSED
         - WAITING
         - CREATED
       example: CREATED
@@ -1212,29 +1159,25 @@ components:
         - IN_PROGRESS
         - COMPLETED
         - FAILED
-        - ABORTED
-        - PAUSED
         - CREATED
         - RETRIED
       example: CREATED
       description: |
         Current operational state of a task, including specialized states like RETRIED for task-specific error handling.
-        Finite states from which no further transitions are possible include: COMPLETED, FAILED, and ABORTED.
-    jobMode:
-      type: string
-      enum:
-        - PRE_DEFINED
-        - DYNAMIC
-      description: Job creation mode determining whether all stages must be defined at creation (PRE_DEFINED) or can be added later (DYNAMIC)
-      example: PRE_DEFINED
+        Finite states from which no further transitions are possible include: COMPLETED and FAILED.
     jobName:
       type: string
-      enum:
-        - INGESTION
-        - EXPORT
-        - DEFAULT
       example: DEFAULT
+      maxLength: 50
       description: Category or type of job processing being performed, used for filtering and system behaviors
+    stageType:
+      type: string
+      maxLength: 50
+      example: unknown
+      description: |
+        Free-form string identifier for stage functionality, allowing flexible categorization
+        of stage operations. Used for routing tasks to appropriate workers and
+        for filtering in API requests. Can be any descriptive name up to 50 characters.
     returnStage:
       type: boolean
       description: Flag indicating whether to include complete stage details in job response payloads
@@ -1264,12 +1207,6 @@ components:
         failed:
           type: integer
           description: Number of tasks that encountered errors and could not be completed
-        aborted:
-          type: integer
-          description: Number of tasks manually stopped before completion
-        paused:
-          type: integer
-          description: Number of tasks temporarily suspended from execution
         created:
           type: integer
           description: Number of tasks in initial state before becoming pending
@@ -1284,8 +1221,6 @@ components:
         - inProgress
         - completed
         - failed
-        - aborted
-        - paused
         - created
         - retried
         - total
@@ -1293,50 +1228,35 @@ components:
     createJobPayload:
       type: object
       properties:
-        jobMode:
-          $ref: '#/components/schemas/jobMode'
         name:
           $ref: '#/components/schemas/jobName'
         data:
           $ref: '#/components/schemas/jobPayload'
         priority:
           $ref: '#/components/schemas/priority'
-        expirationTime:
-          $ref: '#/components/schemas/expirationTime'
-        ttl:
-          $ref: '#/components/schemas/ttl'
-        notifications:
-          $ref: '#/components/schemas/notifications'
         userMetadata:
           $ref: '#/components/schemas/userMetadata'
-        creator:
-          $ref: '#/components/schemas/creator'
-        stages:
-          type: array
-          description: Optional array of stages to create with the job (required for PRE_DEFINED jobs)
-          items:
-            $ref: '#/components/schemas/createStagePayload'
       required:
         - data
-        - jobMode
-        - creator
         - userMetadata
-        - notifications
+        - name
       additionalProperties: false
       description: |
         Input payload for creating a new job in the system.
         Contains all required configuration for job execution, including processing mode,
-        custom parameters, metadata, and optionally pre-defined stages.
-    jobResponse:
+        custom parameters, metadata.
+    job:
       type: object
       required:
         - id
         - name
         - data
-        - jobMode
-        - creator
         - userMetadata
-        - notifications
+        - status
+        - percentage
+        - creationTime
+        - updateTime
+        - priority
       description: job Response model
       properties:
         id:
@@ -1349,37 +1269,42 @@ components:
           $ref: '#/components/schemas/creationTime'
         updateTime:
           $ref: '#/components/schemas/updateTime'
-        jobMode:
-          $ref: '#/components/schemas/jobMode'
         name:
           $ref: '#/components/schemas/jobName'
         data:
           $ref: '#/components/schemas/jobPayload'
         priority:
           $ref: '#/components/schemas/priority'
-        expirationTime:
-          $ref: '#/components/schemas/expirationTime'
-        ttl:
-          $ref: '#/components/schemas/ttl'
-        notifications:
-          $ref: '#/components/schemas/notifications'
         userMetadata:
           $ref: '#/components/schemas/userMetadata'
-        creator:
-          $ref: '#/components/schemas/creator'
         stages:
           type: array
           items:
             $ref: '#/components/schemas/stageResponse'
+    createStagePayloadRequest:
+      allOf:
+        - $ref: '#/components/schemas/createStagePayload'
+        - type: object
+          properties:
+            startAsWaiting:
+              type: boolean
+              description: |
+                Optional flag indicating whether the stage should be created in a waiting state.
+                If true, the stage will not start processing immediately and will require
+                manual intervention to begin execution. Useful for staging workflows where
+                stages need to be prepared but not executed until all dependencies are met.
+              example: false
+          description: |
+            Input payload for creating a new processing stage.
+            Defines the stage type, custom configuration data, and user-defined metadata.
+            Used when adding stages to jobs or creating stages as part of job creation.
+            The startAsWaiting flag allows for creating stages that are not immediately active,
+            enabling more complex workflows where stages can be prepared in advance.
     createStagePayload:
-      description: |
-        Input payload for creating a new processing stage.
-        Defines the stage type, custom configuration data, and user-defined metadata.
-        Used when adding stages to jobs or creating stages as part of job creation.
       type: object
       properties:
         type:
-          $ref: '#/components/schemas/taskType'
+          $ref: '#/components/schemas/stageType'
         data:
           $ref: '#/components/schemas/stagePayload'
         userMetadata:
@@ -1429,20 +1354,6 @@ components:
       type: string
       format: uuid
       description: Unique identifier for a task, generated by the system upon task creation
-    taskType:
-      type: string
-      enum:
-        - TILE_SEEDING
-        - TILE_RENDERING
-        - PUBLISH_CATALOG
-        - PUBLISH_LAYER
-        - DEFAULT
-      maxLength: 255
-      example: DEFAULT
-      description: |
-        Categorization of task functionality, determining the specific operation
-        to be performed. Used for routing tasks to appropriate workers and
-        for filtering in API requests.
     taskPayload:
       type: object
       additionalProperties: true
@@ -1450,19 +1361,6 @@ components:
         Custom task configuration data containing operation-specific parameters.
         The schema varies based on task type and contains all necessary information
         for task execution by workers.
-    createStageWithTasksPayload:
-      allOf:
-        - $ref: '#/components/schemas/createStagePayload'
-        - type: object
-          description: |
-            Extended stage creation payload that includes associated tasks to create
-            alongside the stage. Used when creating a stage with pre-defined tasks
-            in a single operation.
-          properties:
-            tasks:
-              type: array
-              items:
-                $ref: '#/components/schemas/createTaskPayload'
     createTaskPayload:
       type: object
       description: |
@@ -1470,8 +1368,6 @@ components:
         Contains task type, operational parameters, and optional retry configuration.
         Used when adding tasks to existing stages.
       properties:
-        type:
-          $ref: '#/components/schemas/taskType'
         data:
           $ref: '#/components/schemas/taskPayload'
         userMetadata:
@@ -1480,7 +1376,6 @@ components:
           $ref: '#/components/schemas/maxAttempts'
       required:
         - data
-        - type
       additionalProperties: false
     taskResponse:
       type: object
@@ -1491,8 +1386,6 @@ components:
       properties:
         id:
           $ref: '#/components/schemas/taskId'
-        type:
-          $ref: '#/components/schemas/taskType'
         data:
           $ref: '#/components/schemas/taskPayload'
         stageId:
@@ -1511,54 +1404,39 @@ components:
           $ref: '#/components/schemas/maxAttempts'
       required:
         - id
-        - type
         - data
         - stageId
         - status
         - attempts
         - maxAttempts
       additionalProperties: false
-    createJobResponse:
-      type: object
-      description: |
-        Response returned after successful job creation, containing the complete
-        job details including the generated job ID and initial status information.
-      properties:
-        id:
-          $ref: '#/components/schemas/jobId'
-        data:
-          $ref: '#/components/schemas/jobPayload'
-        status:
-          $ref: '#/components/schemas/jobOperationStatus'
-        percentage:
-          $ref: '#/components/schemas/percentage'
-        creationTime:
-          $ref: '#/components/schemas/creationTime'
-        updateTime:
-          $ref: '#/components/schemas/updateTime'
-        expirationTime:
-          $ref: '#/components/schemas/expirationTime'
-        jobMode:
-          $ref: '#/components/schemas/jobMode'
-        userMetadata:
-          $ref: '#/components/schemas/userMetadata'
-        priority:
-          $ref: '#/components/schemas/priority'
-        creator:
-          $ref: '#/components/schemas/creator'
-        ttl:
-          $ref: '#/components/schemas/ttl'
-        notifications:
-          $ref: '#/components/schemas/notifications'
-        name:
-          $ref: '#/components/schemas/jobName'
-        stages:
-          type: array
-          items:
-            $ref: '#/components/schemas/stageResponse'
-      additionalProperties: false
-      required:
-        - id
+    # createJobResponse:
+    #   type: object
+    #   description: |
+    #     Response returned after successful job creation, containing the complete
+    #     job details including the generated job ID and initial status information.
+    #   properties:
+    #     id:
+    #       $ref: '#/components/schemas/jobId'
+    #     data:
+    #       $ref: '#/components/schemas/jobPayload'
+    #     status:
+    #       $ref: '#/components/schemas/jobOperationStatus'
+    #     percentage:
+    #       $ref: '#/components/schemas/percentage'
+    #     creationTime:
+    #       $ref: '#/components/schemas/creationTime'
+    #     updateTime:
+    #       $ref: '#/components/schemas/updateTime'
+    #     userMetadata:
+    #       $ref: '#/components/schemas/userMetadata'
+    #     priority:
+    #       $ref: '#/components/schemas/priority'
+    #     name:
+    #       $ref: '#/components/schemas/jobName'
+    #   additionalProperties: false
+    #   required:
+    #     - id
     errorMessage:
       type: object
       description: |
