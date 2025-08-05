@@ -25,7 +25,7 @@ export type Job<JobName extends string, JobInfo extends JobData = JobData> = Pre
 >;
 
 export type NewJob<JobName extends string, JobInfo extends JobData = JobData> = Prettify<
-  Omit<components['schemas']['createJobPayload'], JobGenericProperties> & {
+  Omit<components['schemas']['createJobPayload'], JobGenericProperties | 'tracestate' | 'traceparent'> & {
     name: JobName;
     userMetadata: JobInfo['userMetadata'];
     data: JobInfo['data'];

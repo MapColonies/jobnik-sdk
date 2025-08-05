@@ -1,5 +1,5 @@
 /* eslint-disable */
-import type { JobId, StageId, TaskId } from './brands';
+import type { TypedRequestHandlers as ImportedTypedRequestHandlers } from '@map-colonies/openapi-helpers/typedRequestHandler';
 export type paths = {
   '/jobs': {
     parameters: {
@@ -174,15 +174,19 @@ export type paths = {
       cookie?: never;
     };
     /**
-     * Retrieve all stages for a specific job
-     * @description Fetches all stages associated with the specified job ID.
-     *     Provides complete information about each stage including type, status, and progress.
+     * Retrieve all stages for a specific job in execution order
+     * @description Fetches all stages associated with the specified job ID, automatically ordered by
+     *     their execution sequence (order field). Provides complete information about each
+     *     stage including type, status, progress, and sequential order number.
+     *
+     *     Stages are returned in ascending order based on their order field (1, 2, 3, etc.)
+     *     to maintain the correct workflow execution sequence defined when stages were created.
      *
      *     Optional inclusion of related task data via the should_return_tasks parameter,
      *     allowing clients to retrieve the complete job hierarchy in a single request.
      *
      */
-    get: operations['getStageByJobId'];
+    get: operations['getStagesByJobId'];
     put?: never;
     post?: never;
     delete?: never;
@@ -201,11 +205,14 @@ export type paths = {
     get?: never;
     put?: never;
     /**
-     * Add a new stage to a job
-     * @description Appends a new stage to an existing job.
+     * Add a new stage as the last stage in the job workflow
+     * @description Appends a new stage to an existing job with automatic order assignment.
      *     The stage will be added after any existing stages in the job's workflow sequence.
+     *     Each stage is automatically assigned an incremental order number (1, 2, 3, etc.)
+     *     within the scope of its parent job to maintain execution sequence.
      *
      *     This endpoint allows for extending job workflows at runtime by adding new processing steps.
+     *     The order field ensures stages are processed in the correct sequence when retrieved.
      *
      *     The job must exist and be in a valid state to accept new stages.
      *
@@ -424,7 +431,7 @@ export type paths = {
       query?: {
         /** @description Filter results by stage identifier */
         stage_id?: components['parameters']['paramStageId'];
-        /** @description Filter results by stage identifier */
+        /** @description Filter results by stage type (e.g., processing, validation) */
         stage_type?: components['parameters']['paramStageType'];
         /** @description Filter results by update time, starting from this date/time */
         from_date?: components['parameters']['fromDate'];
@@ -556,7 +563,7 @@ export type components = {
      * Format: uuid
      * @description Unique identifier for a job
      */
-    jobId: JobId;
+    jobId: string;
     /** @description Custom job configuration data containing job-specific parameters */
     jobPayload: {
       [key: string]: unknown;
@@ -571,17 +578,50 @@ export type components = {
      * Format: uuid
      * @description Unique identifier for a stage
      */
-    stageId: StageId;
+    stageId: string;
     /** @description Custom stage configuration data containing stage-specific parameters */
     stagePayload: {
       [key: string]: unknown;
     };
     /**
-     * @description Relative importance of the job, affecting processing order
+     * @description Sequential order number of the stage within its job, used for maintaining execution sequence
+     * @example 1
+     */
+    order: number;
+    /**
+     * @description Priority level that determines the relative importance of the job for processing order.
+     *     Higher priority jobs are processed before lower priority ones when system resources
+     *     are constrained. Priority affects task dequeuing order and scheduling decisions.
+     *
+     *     Priority levels from highest to lowest:
+     *     - VERY_HIGH: Critical jobs requiring immediate processing
+     *     - HIGH: Important jobs with elevated priority
+     *     - MEDIUM: Standard priority for regular operations
+     *     - LOW: Non-urgent jobs that can be delayed
+     *     - VERY_LOW: Background jobs with minimal priority
+     *
      * @example LOW
      * @enum {string}
      */
     priority: 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW' | 'VERY_LOW';
+    /**
+     * @description Traceparent identifier for distributed tracing.
+     *     When creating resources, this field is optional - if not provided, the system will automatically inject
+     *     both traceparent and tracestate from the active OpenTelemetry context using propagation.inject().
+     *     In response objects, this field is always present and required.
+     *     [here the offical W3C docs](https://www.w3.org/TR/trace-context/)
+     *
+     * @example 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+     */
+    traceparent: string;
+    /**
+     * @description Tracestate identifier for distributed tracing (optional, can be null).
+     *     When creating resources without providing traceparent, the system will attempt to inject
+     *     tracestate from the active OpenTelemetry context, but it may still be null if not available in the context.
+     *
+     * @example rojo=00f067aa0ba902b7,congo=t61rcWkgMzE
+     */
+    tracestate: string;
     /**
      * @description Standard success message codes used in API responses
      * @example JOB_MODIFIED_SUCCESSFULLY
@@ -629,7 +669,10 @@ export type components = {
     returnStage: boolean;
     /** @description Flag indicating whether to include complete task details in stage response payloads */
     returnTask: boolean;
-    /** @description Application-specific custom data container that can store arbitrary client information without affecting core operations */
+    /**
+     * @description Application-specific custom data container that can store arbitrary client information without affecting core operations
+     * @default {}
+     */
     userMetadata: {
       [key: string]: unknown;
     };
@@ -656,25 +699,42 @@ export type components = {
     /** @description Input payload for creating a new job in the system.
      *     Contains all required configuration for job execution, including processing mode,
      *     custom parameters, metadata.
+     *
+     *     Tracing fields (traceparent, tracestate) are optional:
+     *     - If traceparent is provided, user's trace context is used (tracestate defaults to null if not provided)
+     *     - If traceparent is not provided, the system automatically injects both traceparent and tracestate
+     *       from the active OpenTelemetry context using propagation.inject() (tracestate may still be null if not available)
      *      */
     createJobPayload: {
       name: components['schemas']['jobName'];
       data: components['schemas']['jobPayload'];
-      priority?: components['schemas']['priority'];
-      userMetadata: components['schemas']['userMetadata'];
+      priority?: components['schemas']['priority'] & unknown;
+      userMetadata?: components['schemas']['userMetadata'];
+      traceparent?: components['schemas']['traceparent'];
+      tracestate?: components['schemas']['tracestate'];
     };
-    /** @description job Response model */
+    /** @description Complete job information with status and metadata.
+     *
+     *     Comprehensive job response model containing all job details including configuration,
+     *     execution status, progress tracking, and associated metadata. This schema represents
+     *     the complete state of a job in the system and is returned by job retrieval operations.
+     *
+     *     Includes optional stage data when requested via query parameters, allowing clients
+     *     to retrieve the complete job hierarchy in a single request.
+     *      */
     job: {
-      readonly id: components['schemas']['jobId'];
-      readonly status: components['schemas']['jobOperationStatus'];
-      readonly percentage: components['schemas']['percentage'];
-      readonly creationTime: components['schemas']['creationTime'];
-      readonly updateTime: components['schemas']['updateTime'];
+      id: components['schemas']['jobId'];
+      status?: components['schemas']['jobOperationStatus'];
+      percentage?: components['schemas']['percentage'];
+      creationTime?: components['schemas']['creationTime'];
+      updateTime?: components['schemas']['updateTime'];
       name: components['schemas']['jobName'];
       data: components['schemas']['jobPayload'];
-      priority: components['schemas']['priority'];
+      priority?: components['schemas']['priority'];
       userMetadata: components['schemas']['userMetadata'];
-      readonly stages?: components['schemas']['stageResponse'][];
+      traceparent: components['schemas']['traceparent'];
+      tracestate?: components['schemas']['tracestate'];
+      stages?: components['schemas']['stageResponse'][];
     };
     createStagePayloadRequest: components['schemas']['createStagePayload'] & {
       /**
@@ -687,10 +747,20 @@ export type components = {
        */
       startAsWaiting?: boolean;
     };
+    /** @description Input payload for creating a new stage within a job.
+     *     Contains stage type, operational parameters, and optional user metadata.
+     *
+     *     Tracing fields (traceparent, tracestate) are optional:
+     *     - If traceparent is provided, user's trace context is used (tracestate defaults to null if not provided)
+     *     - If traceparent is not provided, the system automatically injects both traceparent and tracestate
+     *       from the active OpenTelemetry context using propagation.inject() (tracestate may still be null if not available)
+     *      */
     createStagePayload: {
       type: components['schemas']['stageType'];
       data: components['schemas']['stagePayload'];
-      userMetadata: components['schemas']['userMetadata'];
+      userMetadata?: components['schemas']['userMetadata'];
+      traceparent?: components['schemas']['traceparent'];
+      tracestate?: components['schemas']['tracestate'];
     };
     stageResponse: components['schemas']['createStagePayload'] & {
       id: components['schemas']['stageId'];
@@ -698,6 +768,8 @@ export type components = {
       percentage?: components['schemas']['percentage'];
       status?: components['schemas']['stageOperationStatus'];
       jobId: components['schemas']['jobId'];
+      order: components['schemas']['order'];
+      traceparent: components['schemas']['traceparent'];
     };
     getStageResponse: components['schemas']['stageResponse'] & {
       /** @description Associated tasks belonging to this stage */
@@ -707,7 +779,7 @@ export type components = {
      * Format: uuid
      * @description Unique identifier for a task, generated by the system upon task creation
      */
-    taskId: TaskId;
+    taskId: string;
     /** @description Custom task configuration data containing operation-specific parameters.
      *     The schema varies based on task type and contains all necessary information
      *     for task execution by workers.
@@ -718,11 +790,18 @@ export type components = {
     /** @description Input payload for creating a new task within a stage.
      *     Contains task type, operational parameters, and optional retry configuration.
      *     Used when adding tasks to existing stages.
+     *
+     *     Trace propagation  (traceparent, tracestate) are optional:
+     *     - If traceparent is provided, user's trace context is used (tracestate defaults to null if not provided)
+     *     - If traceparent is not provided, the system automatically injects both traceparent and tracestate
+     *       from the active OpenTelemetry context using propagation.inject() (tracestate may still be null if not available)
      *      */
     createTaskPayload: {
       data: components['schemas']['taskPayload'];
       userMetadata?: components['schemas']['userMetadata'];
       maxAttempts?: components['schemas']['maxAttempts'];
+      traceparent?: components['schemas']['traceparent'];
+      tracestate?: components['schemas']['tracestate'];
     };
     /** @description Complete task information returned by the API, including all configuration
      *     data along with execution status, attempt tracking, and associated stage reference.
@@ -738,6 +817,8 @@ export type components = {
       status: components['schemas']['taskOperationStatus'];
       attempts: components['schemas']['attempts'];
       maxAttempts: components['schemas']['maxAttempts'];
+      traceparent: components['schemas']['traceparent'];
+      tracestate?: components['schemas']['tracestate'];
     };
     /** @description Standard error response structure used when API operations encounter problems.
      *     Contains a human-readable message and optional stack trace for debugging.
@@ -771,7 +852,7 @@ export type components = {
     /** @description Unique identifier for the stage */
     stageId: components['schemas']['stageId'];
     /** @description Unique identifier for the task */
-    taskId: string;
+    taskId: components['schemas']['taskId'];
     /** @description Filter tasks by their operational status */
     paramsTaskStatus: components['schemas']['taskOperationStatus'];
     /** @description Filter jobs by their name/type */
@@ -790,7 +871,7 @@ export type components = {
     paramStageId: components['schemas']['stageId'];
     /** @description Filter results by job identifier */
     paramJobId: components['schemas']['jobId'];
-    /** @description Filter results by stage identifier */
+    /** @description Filter results by stage type (e.g., processing, validation) */
     paramStageType: components['schemas']['stageType'];
     /** @description Stage type identifier for dequeuing tasks */
     stageType: components['schemas']['stageType'];
@@ -1186,7 +1267,7 @@ export interface operations {
       };
     };
   };
-  getStageByJobId: {
+  getStagesByJobId: {
     parameters: {
       query?: {
         /** @description When true, includes task data in the response */
@@ -1298,7 +1379,7 @@ export interface operations {
       query?: {
         /** @description Filter results by job identifier */
         job_id?: components['parameters']['paramJobId'];
-        /** @description Filter results by stage identifier */
+        /** @description Filter results by stage type (e.g., processing, validation) */
         stage_type?: components['parameters']['paramStageType'];
         /** @description Filter results by stage operational status (e.g., PENDING, IN_PROGRESS).
          *     Used to find stages in specific execution states.
@@ -1720,7 +1801,7 @@ export interface operations {
       query?: {
         /** @description Filter results by stage identifier */
         stage_id?: components['parameters']['paramStageId'];
-        /** @description Filter results by stage identifier */
+        /** @description Filter results by stage type (e.g., processing, validation) */
         stage_type?: components['parameters']['paramStageType'];
         /** @description Filter results by update time, starting from this date/time */
         from_date?: components['parameters']['fromDate'];
@@ -1937,3 +2018,4 @@ export interface operations {
     };
   };
 }
+export type TypedRequestHandlers = ImportedTypedRequestHandlers<paths, operations>;

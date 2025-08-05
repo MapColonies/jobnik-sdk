@@ -1,4 +1,4 @@
-import { Span, SpanKind, SpanStatusCode } from '@opentelemetry/api';
+import { Span, SpanKind, SpanStatusCode, context, propagation, trace } from '@opentelemetry/api';
 import { ApiClient } from '../api';
 import { JobId, StageId } from '../types/brands';
 import { InferJobData, Job, JobTypesTemplate, NewJob, ValidJobName } from '../types/job';
@@ -13,6 +13,7 @@ import {
   ATTR_MESSAGING_MESSAGE_CONVERSATION_ID,
 } from '../telemetry/semconv';
 import { InferStageData, NewStage, Stage, StageTypesTemplate, ValidStageType } from '../types/stage';
+import { components } from '../types/openapi';
 
 interface JobTypess {
   avi: {
@@ -87,6 +88,8 @@ class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageT
         kind: SpanKind.CLIENT,
       },
       async (span) => {
+        propagation.inject(context.active(), jobData);
+
         const { data, error } = await this.apiClient.POST('/jobs', {
           body: jobData,
         });
@@ -108,7 +111,6 @@ class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageT
     return withSpan(
       `add_stage ${stageData.type}`,
       {
-        // LINK TO PARENT links: []
         kind: SpanKind.CLIENT,
         attributes: {
           [ATTR_MESSAGING_MESSAGE_CONVERSATION_ID]: jobId,
@@ -116,6 +118,25 @@ class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageT
         },
       },
       async (span) => {
+        const jobResponse = await this.apiClient.GET(`/jobs/{jobId}`, { params: { path: { jobId } } });
+
+        if (jobResponse.error !== undefined) {
+          throw new Error(`Failed to retrieve job ${jobId}`, { cause: jobResponse.error });
+        }
+
+        const remoteContext = propagation.extract(context.active(), jobResponse.data);
+        const jobSpanContext = trace.getSpanContext(remoteContext);
+
+        if (!jobSpanContext) {
+          throw new Error(`Failed to extract span context for job ${jobId}`);
+        }
+
+        span.addLink({
+          context: jobSpanContext,
+        });
+
+        propagation.inject(context.active(), jobResponse.data);
+
         const { data, error } = await this.apiClient.POST(`/jobs/{jobId}/stage`, {
           body: stageData,
           params: { path: { jobId } },
@@ -141,18 +162,48 @@ class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageT
     }
 
     return withSpan(
-      `send unknown`,
+      `send ${stageType}`,
       {
         attributes: {
           [ATTR_JOB_MANAGER_STAGE_ID]: stageId,
-          // [ATTR_MESSAGING_DESTINATION_NAME]: stageType,
+          [ATTR_MESSAGING_DESTINATION_NAME]: stageType,
           [ATTR_MESSAGING_BATCH_MESSAGE_COUNT]: taskData.length,
         },
       },
       async (span) => {
-        let producerSpans: Span[] = [];
+        const producerSpans: Span[] = [];
+
+        const stageResponse = await this.apiClient.GET(`/stages/{stageId}`, { params: { path: { stageId } } });
+
+        if (stageResponse.error !== undefined) {
+          throw new Error(`Failed to retrieve stage ${stageId}`, { cause: stageResponse.error });
+        }
+
+        if (stageResponse.data.type !== stageType) {
+          throw new Error(`Stage type mismatch: expected ${stageType}, got ${stageResponse.data.type}`);
+        }
+
+        const remoteContext = propagation.extract(context.active(), stageResponse.data);
+        const stageSpanContext = trace.getSpanContext(remoteContext);
+        if (!stageSpanContext) {
+          throw new Error(`Failed to extract span context for stage ${stageId}`);
+        }
+        span.addLink({
+          context: stageSpanContext,
+        });
+
         try {
-          producerSpans = taskData.map(() => tracer.startSpan(`create ${stageType}`, { kind: SpanKind.PRODUCER }));
+          const tasksWithTraceContext: components['schemas']['createTaskPayload'][] = [];
+
+          for (const task of taskData) {
+            const producerSpan = tracer.startSpan(`create ${stageType}`, { kind: SpanKind.PRODUCER });
+            const taskClone = structuredClone(task);
+
+            propagation.inject(trace.setSpan(context.active(), producerSpan), taskClone);
+
+            producerSpans.push(producerSpan);
+            tasksWithTraceContext.push(taskClone);
+          }
 
           const { error, data } = await this.apiClient.POST(`/stages/{stageId}/tasks`, {
             body: taskData,
@@ -168,12 +219,9 @@ class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageT
           producerSpans.forEach((span) => {
             span.setStatus({ code: SpanStatusCode.ERROR, message: 'Parent send operation failed' });
           });
-          span.recordException(error as Error);
-          span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
           throw error;
         } finally {
           producerSpans.forEach((span) => span.end());
-          span.end();
         }
       }
     );
