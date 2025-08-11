@@ -8,6 +8,11 @@ if (process.env.GITHUB_ACTIONS) {
 
 export default defineConfig({
   test: {
+    typecheck: {
+      enabled: true,
+      tsconfig: 'tsconfig.json',
+      ignoreSourceErrors: true,
+    },
     reporters,
     include: ['tests/**/*.spec.ts'],
     coverage: {

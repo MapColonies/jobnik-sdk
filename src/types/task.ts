@@ -1,5 +1,5 @@
 import { components } from './openapi';
-import { StageTypesTemplate } from './stage';
+import { StageData, StageTypesTemplate } from './stage';
 import { Prettify } from './utils';
 
 type UserMetadata = components['schemas']['userMetadata'];
@@ -13,10 +13,8 @@ export interface TaskData {
 
 export type ValidTaskType<TaskTypes> = Extract<keyof TaskTypes, string> | (string & {});
 
-export type InferTaskData<StageType, StageTypes extends StageTypesTemplate> =
+export type InferTaskData<StageType, StageTypes extends { [K in keyof StageTypes]: StageData }> =
   StageType extends Extract<keyof StageTypes, string> ? StageTypes[StageType]['task'] : TaskData;
-
-export type TaskTypesTemplate = Record<string, TaskData>;
 
 export type Task<TaskInfo extends TaskData = TaskData> = Prettify<
   Omit<components['schemas']['taskResponse'], TaskGenericProperties> & {

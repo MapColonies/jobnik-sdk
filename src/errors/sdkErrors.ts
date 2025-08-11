@@ -1,4 +1,5 @@
 import statusCodes from 'http-status-codes';
+import { API_ERRORS_MAP } from '../generated/openapi-errors';
 import { JobnikSDKError } from './baseError';
 
 /**
@@ -8,6 +9,7 @@ import { JobnikSDKError } from './baseError';
  */
 /* eslint-disable @typescript-eslint/naming-convention */
 export const JOBNIK_SDK_ERROR_CODES = {
+  ...API_ERRORS_MAP,
   // Network Errors
   NETWORK_CONNECTION_REFUSED: 'NETWORK_CONNECTION_REFUSED',
   NETWORK_TIMEOUT: 'NETWORK_TIMEOUT',
@@ -28,8 +30,6 @@ export const JOBNIK_SDK_ERROR_CODES = {
   JOB_PROCESSING_FAILED: 'JOB_PROCESSING_FAILED',
 
   // HTTP Client Errors (mapped from JobProcessingError subtypes)
-  HTTP_BAD_REQUEST: 'HTTP_BAD_REQUEST',
-  HTTP_NOT_FOUND: 'HTTP_NOT_FOUND',
   HTTP_INTERNAL_SERVER_ERROR: 'HTTP_INTERNAL_SERVER_ERROR',
   HTTP_BAD_GATEWAY: 'HTTP_BAD_GATEWAY',
   HTTP_SERVICE_UNAVAILABLE: 'HTTP_SERVICE_UNAVAILABLE',
@@ -81,11 +81,11 @@ export class ConfigurationError extends JobnikSDKError {
 }
 
 /**
- * Base error class for issues encountered during job processing via the API.
+ * Base error class for issues encountered while interacting with the API.
  * This class includes an HTTP status code and an optional API-specific error code.
  * @public
  */
-export class JobProcessingError extends JobnikSDKError {
+export class APIError extends JobnikSDKError {
   /**
    * HTTP status code associated with this error.
    * @public
@@ -105,135 +105,133 @@ export class JobProcessingError extends JobnikSDKError {
    * @param message - The error message.
    * @param statusCode - HTTP status code.
    * @param errorCode - A specific job processing error code from {@link JOBNIK_SDK_ERROR_CODES}.
-   * @param apiErrorCode - Optional error code from the API response.
    * @param cause - Optional original error or server response data.
    */
-  public constructor(message: string, statusCode: number, errorCode: JobnikSDKErrorCode, apiErrorCode?: string, cause?: unknown) {
+  public constructor(message: string, statusCode: number, errorCode: JobnikSDKErrorCode, cause?: unknown) {
     super(message, errorCode, cause);
     this.statusCode = statusCode;
-    this.apiErrorCode = apiErrorCode;
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
-/**
- * Error class for when a request is malformed or invalid (e.g., 400 Bad Request).
- * @public
- */
-export class BadRequestError extends JobProcessingError {
-  /**
-   * Creates an instance of BadRequestError.
-   * @param message - The error message.
-   * @param apiErrorCode - Optional error code from the API response.
-   * @param cause - Optional original error or server response data.
-   */
-  public constructor(message: string, apiErrorCode?: string, cause?: unknown) {
-    super(message, statusCodes.BAD_REQUEST, JOBNIK_SDK_ERROR_CODES.HTTP_BAD_REQUEST, apiErrorCode, cause);
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
+// /**
+//  * Error class for when a request is malformed or invalid (e.g., 400 Bad Request).
+//  * @public
+//  */
+// export class BadRequestError extends JobProcessingError {
+//   /**
+//    * Creates an instance of BadRequestError.
+//    * @param message - The error message.
+//    * @param apiErrorCode - Optional error code from the API response.
+//    * @param cause - Optional original error or server response data.
+//    */
+//   public constructor(message: string, apiErrorCode?: string, cause?: unknown) {
+//     super(message, statusCodes.BAD_REQUEST, JOBNIK_SDK_ERROR_CODES.HTTP_BAD_REQUEST, apiErrorCode, cause);
+//     Object.setPrototypeOf(this, new.target.prototype);
+//   }
+// }
 
-/**
- * Error class for when a requested resource is not found (e.g., 404 Not Found).
- * @public
- */
-export class NotFoundError extends JobProcessingError {
-  /**
-   * Creates an instance of NotFoundError.
-   * @param resourceType - The type of resource that was not found (e.g., 'Job', 'Stage', 'Task').
-   * @param resourceId - The ID of the resource that was not found.
-   * @param apiErrorCode - Optional error code from the API response.
-   * @param cause - Optional original error or server response data.
-   */
-  public constructor(resourceType: string, resourceId: string, apiErrorCode?: string, cause?: unknown) {
-    super(
-      `Resource ${resourceType} with ID ${resourceId} not found.`,
-      statusCodes.NOT_FOUND,
-      JOBNIK_SDK_ERROR_CODES.HTTP_NOT_FOUND,
-      apiErrorCode,
-      cause
-    );
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
+// /**
+//  * Error class for when a requested resource is not found (e.g., 404 Not Found).
+//  * @public
+//  */
+// export class NotFoundError extends JobProcessingError {
+//   /**
+//    * Creates an instance of NotFoundError.
+//    * @param resourceType - The type of resource that was not found (e.g., 'Job', 'Stage', 'Task').
+//    * @param resourceId - The ID of the resource that was not found.
+//    * @param apiErrorCode - Optional error code from the API response.
+//    * @param cause - Optional original error or server response data.
+//    */
+//   public constructor(resourceType: string, resourceId: string, apiErrorCode?: string, cause?: unknown) {
+//     super(
+//       `Resource ${resourceType} with ID ${resourceId} not found.`,
+//       statusCodes.NOT_FOUND,
+//       JOBNIK_SDK_ERROR_CODES.HTTP_NOT_FOUND,
+//       apiErrorCode,
+//       cause
+//     );
+//     Object.setPrototypeOf(this, new.target.prototype);
+//   }
+// }
 
-/**
- * Error class for unexpected server-side errors (e.g., 500 Internal Server Error).
- * @public
- */
-export class InternalServerError extends JobProcessingError {
-  /**
-   * Creates an instance of InternalServerError.
-   * @param message - The error message.
-   * @param apiErrorCode - Optional error code from the API response.
-   * @param cause - Optional original error or server response data.
-   */
-  public constructor(message: string, apiErrorCode?: string, cause?: unknown) {
-    super(message, statusCodes.INTERNAL_SERVER_ERROR, JOBNIK_SDK_ERROR_CODES.HTTP_INTERNAL_SERVER_ERROR, apiErrorCode, cause);
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
+// /**
+//  * Error class for unexpected server-side errors (e.g., 500 Internal Server Error).
+//  * @public
+//  */
+// export class InternalServerError extends JobProcessingError {
+//   /**
+//    * Creates an instance of InternalServerError.
+//    * @param message - The error message.
+//    * @param apiErrorCode - Optional error code from the API response.
+//    * @param cause - Optional original error or server response data.
+//    */
+//   public constructor(message: string, apiErrorCode?: string, cause?: unknown) {
+//     super(message, statusCodes.INTERNAL_SERVER_ERROR, JOBNIK_SDK_ERROR_CODES.HTTP_INTERNAL_SERVER_ERROR, apiErrorCode, cause);
+//     Object.setPrototypeOf(this, new.target.prototype);
+//   }
+// }
 
 /**
  * Error class for bad gateway errors (e.g., 502 Bad Gateway).
  * @public
  */
-export class BadGatewayError extends JobProcessingError {
-  /**
-   * Creates an instance of BadGatewayError.
-   * @param message - The error message.
-   * @param apiErrorCode - Optional error code from the API response.
-   * @param cause - Optional original error or server response data.
-   */
-  public constructor(message: string, apiErrorCode?: string, cause?: unknown) {
-    super(message, statusCodes.BAD_GATEWAY, JOBNIK_SDK_ERROR_CODES.HTTP_BAD_GATEWAY, apiErrorCode, cause);
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
+// export class BadGatewayError extends APIError {
+//   /**
+//    * Creates an instance of BadGatewayError.
+//    * @param message - The error message.
+//    * @param apiErrorCode - Optional error code from the API response.
+//    * @param cause - Optional original error or server response data.
+//    */
+//   public constructor(message: string, cause?: unknown) {
+//     super(message, statusCodes.BAD_GATEWAY, JOBNIK_SDK_ERROR_CODES.HTTP_BAD_GATEWAY, cause);
+//     Object.setPrototypeOf(this, new.target.prototype);
+//   }
+// }
 
-/**
- * Error class for service unavailable errors (e.g., 503 Service Unavailable).
- * @public
- */
-export class ServiceUnavailableError extends JobProcessingError {
-  /**
-   * Creates an instance of ServiceUnavailableError.
-   * @param message - The error message.
-   * @param apiErrorCode - Optional error code from the API response.
-   * @param cause - Optional original error or server response data.
-   */
-  public constructor(message: string, apiErrorCode?: string, cause?: unknown) {
-    super(message, statusCodes.SERVICE_UNAVAILABLE, JOBNIK_SDK_ERROR_CODES.HTTP_SERVICE_UNAVAILABLE, apiErrorCode, cause);
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
+// /**
+//  * Error class for service unavailable errors (e.g., 503 Service Unavailable).
+//  * @public
+//  */
+// export class ServiceUnavailableError extends APIError {
+//   /**
+//    * Creates an instance of ServiceUnavailableError.
+//    * @param message - The error message.
+//    * @param apiErrorCode - Optional error code from the API response.
+//    * @param cause - Optional original error or server response data.
+//    */
+//   public constructor(message: string, cause?: unknown) {
+//     super(message, statusCodes.SERVICE_UNAVAILABLE, JOBNIK_SDK_ERROR_CODES.HTTP_SERVICE_UNAVAILABLE, cause);
+//     Object.setPrototypeOf(this, new.target.prototype);
+//   }
+// }
 
-/**
- * Error class for gateway timeout errors (e.g., 504 Gateway Timeout).
- * @public
- */
-export class GatewayTimeoutError extends JobProcessingError {
-  /**
-   * Creates an instance of GatewayTimeoutError.
-   * @param message - The error message.
-   * @param apiErrorCode - Optional error code from the API response.
-   * @param cause - Optional original error or server response data.
-   */
-  public constructor(message: string, apiErrorCode?: string, cause?: unknown) {
-    super(message, statusCodes.GATEWAY_TIMEOUT, JOBNIK_SDK_ERROR_CODES.HTTP_GATEWAY_TIMEOUT, apiErrorCode, cause);
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
+// /**
+//  * Error class for gateway timeout errors (e.g., 504 Gateway Timeout).
+//  * @public
+//  */
+// export class GatewayTimeoutError extends APIError {
+//   /**
+//    * Creates an instance of GatewayTimeoutError.
+//    * @param message - The error message.
+//    * @param apiErrorCode - Optional error code from the API response.
+//    * @param cause - Optional original error or server response data.
+//    */
+//   public constructor(message: string, cause?: unknown) {
+//     super(message, statusCodes.GATEWAY_TIMEOUT, JOBNIK_SDK_ERROR_CODES.HTTP_GATEWAY_TIMEOUT, cause);
+//     Object.setPrototypeOf(this, new.target.prototype);
+//   }
+// }
 
-export class ValidationError extends Error {
-  public readonly code = 'VALIDATION_ERROR';
-  /**
-   * Creates an instance of ValidationError.
-   * @param message - The error message.
-   * @param cause - Optional original error or server response data.
-   */
-  public constructor(message: string, cause?: unknown) {
-    super(message, { cause });
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
+// export class ValidationError extends Error {
+//   public readonly code = 'VALIDATION_ERROR';
+//   /**
+//    * Creates an instance of ValidationError.
+//    * @param message - The error message.
+//    * @param cause - Optional original error or server response data.
+//    */
+//   public constructor(message: string, cause?: unknown) {
+//     super(message, { cause });
+//     Object.setPrototypeOf(this, new.target.prototype);
+//   }
+// }

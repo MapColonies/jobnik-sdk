@@ -6,7 +6,7 @@ type UserMetadata = components['schemas']['userMetadata'];
 type StagePayload = components['schemas']['stagePayload'];
 type StageGenericProperties = 'userMetadata' | 'data' | 'type';
 
-interface StageData {
+export interface StageData {
   userMetadata: UserMetadata;
   data: StagePayload;
   task: TaskData;

@@ -1,7 +1,7 @@
 import { Span, SpanKind, SpanStatusCode, context, propagation, trace } from '@opentelemetry/api';
 import { ApiClient } from '../api';
 import { JobId, StageId } from '../types/brands';
-import { InferJobData, Job, JobTypesTemplate, NewJob, ValidJobName } from '../types/job';
+import { InferJobData, Job, JobData, NewJob, ValidJobName } from '../types/job';
 import { InferTaskData, NewTask, Task } from '../types/task';
 import { tracer, withSpan } from '../telemetry/trace';
 import {
@@ -12,68 +12,16 @@ import {
   ATTR_MESSAGING_DESTINATION_NAME,
   ATTR_MESSAGING_MESSAGE_CONVERSATION_ID,
 } from '../telemetry/semconv';
-import { InferStageData, NewStage, Stage, StageTypesTemplate, ValidStageType } from '../types/stage';
+import { InferStageData, NewStage, Stage, StageData, ValidStageType } from '../types/stage';
 import { components } from '../types/openapi';
-
-interface JobTypess {
-  avi: {
-    userMetadata: {
-      x: string;
-      y: string;
-    };
-    data: {
-      z: string;
-      w: string;
-    };
-  };
-  josh: {
-    userMetadata: {
-      a: string;
-      b: string;
-    };
-    data: {
-      c: string;
-      d: string;
-    };
-  };
-}
-
-interface TaskTypess {
-  nati: {
-    userMetadata: {
-      e: string;
-    };
-    data: {
-      f: string;
-    };
-    task: {
-      userMetadata: {
-        g: string;
-      };
-      data: {
-        h: string;
-      };
-    };
-  };
-  daniel: {
-    userMetadata: {
-      i: string;
-    };
-    data: {
-      j: string;
-    };
-    task: {
-      userMetadata: {
-        k: string;
-      };
-      data: { l: string };
-    };
-  };
-}
+import { Logger } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageTypesTemplate = {}> {
-  public constructor(private readonly apiClient: ApiClient) {}
+export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, StageTypes extends { [K in keyof StageTypes]: StageData } = {}> {
+  public constructor(
+    private readonly apiClient: ApiClient,
+    private readonly logger: Logger
+  ) {}
 
   public async createJob<JobName extends ValidJobName<JobTypes>>(
     jobData: NewJob<JobName, InferJobData<JobName, JobTypes>>
@@ -87,6 +35,7 @@ class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageT
         },
         kind: SpanKind.CLIENT,
       },
+      this.logger,
       async (span) => {
         propagation.inject(context.active(), jobData);
 
@@ -99,7 +48,7 @@ class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageT
         }
 
         span.setAttribute(ATTR_MESSAGING_MESSAGE_CONVERSATION_ID, data.id);
-        return data as Job<JobName, JobTypes[JobName]>;
+        return data as Job<JobName, InferJobData<JobName, JobTypes>>;
       }
     );
   }
@@ -117,6 +66,7 @@ class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageT
           [ATTR_MESSAGING_DESTINATION_NAME]: stageData.type,
         },
       },
+      this.logger,
       async (span) => {
         const jobResponse = await this.apiClient.GET(`/jobs/{jobId}`, { params: { path: { jobId } } });
 
@@ -147,12 +97,12 @@ class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageT
         }
 
         span.setAttribute(ATTR_JOB_MANAGER_STAGE_ID, data.id);
-        return data as Stage<StageType, StageTypes[StageType]>;
+        return data as Stage<StageType, InferStageData<StageType, StageTypes>>;
       }
     );
   }
 
-  public async createTask<StageType extends ValidStageType<StageTypes>>(
+  public async createTasks<StageType extends ValidStageType<StageTypes>>(
     stageId: StageId,
     stageType: StageType,
     taskData: NewTask<InferTaskData<StageType, StageTypes>>[]
@@ -170,6 +120,7 @@ class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageT
           [ATTR_MESSAGING_BATCH_MESSAGE_COUNT]: taskData.length,
         },
       },
+      this.logger,
       async (span) => {
         const producerSpans: Span[] = [];
 
@@ -227,18 +178,3 @@ class Producer<JobTypes extends JobTypesTemplate = {}, StageTypes extends StageT
     );
   }
 }
-
-// @ts-ignore
-const producer = new Producer<JobTypess, TaskTypess>();
-
-void producer.createJob({ name: '', priority: 'MEDIUM', data: {}, userMetadata: { x: 'x', y: 'y' } });
-
-void producer.createStage('aaa' as JobId, {
-  type: 'daniel',
-  data: { j: 'j' },
-  userMetadata: { i: 'i' },
-});
-
-void producer.createTask('bbb' as StageId, 'nati', [{ data: { h: 'h' }, userMetadata: { g: 'g' } }]);
-
-void producer.createStage('jobId' as JobId, { data: { j: '' }, type: 'avi', userMetadata: { i: 'ofer' } });
