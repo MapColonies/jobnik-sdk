@@ -1,6 +1,15 @@
-import statusCodes from 'http-status-codes';
 import { API_ERRORS_MAP } from '../generated/openapi-errors';
-import { JobnikSDKError } from './baseError';
+
+/* eslint-disable @typescript-eslint/naming-convention */
+export const API_ERROR_CODES = {
+  ...API_ERRORS_MAP,
+  HTTP_BAD_GATEWAY: 'HTTP_BAD_GATEWAY',
+  HTTP_SERVICE_UNAVAILABLE: 'HTTP_SERVICE_UNAVAILABLE',
+  HTTP_GATEWAY_TIMEOUT: 'HTTP_GATEWAY_TIMEOUT',
+};
+/* eslint-enable @typescript-eslint/naming-convention */
+
+export type APIErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
 
 /**
  * Error constants for the Jobnik SDK.
@@ -9,7 +18,7 @@ import { JobnikSDKError } from './baseError';
  */
 /* eslint-disable @typescript-eslint/naming-convention */
 export const JOBNIK_SDK_ERROR_CODES = {
-  ...API_ERRORS_MAP,
+  ...API_ERROR_CODES,
   // Network Errors
   NETWORK_CONNECTION_REFUSED: 'NETWORK_CONNECTION_REFUSED',
   NETWORK_TIMEOUT: 'NETWORK_TIMEOUT',
@@ -26,14 +35,13 @@ export const JOBNIK_SDK_ERROR_CODES = {
   CONFIGURATION_INVALID_RETRY_POLICY: 'CONFIGURATION_INVALID_RETRY_POLICY',
   CONFIGURATION_MISSING_REQUIRED_FIELD: 'CONFIGURATION_MISSING_REQUIRED_FIELD',
 
+  TRACE_CONTEXT_EXTRACT_ERROR: 'TRACE_CONTEXT_EXTRACT_ERROR',
+  REQUEST_FAILED_ERROR: 'REQUEST_FAILED_ERROR',
+  EMPTY_TASK_DATA_ERROR: 'EMPTY_TASK_DATA_ERROR',
+  STAGE_TYPE_MISMATCH_ERROR: 'STAGE_TYPE_MISMATCH_ERROR',
+
   // Job Processing Errors (General)
   JOB_PROCESSING_FAILED: 'JOB_PROCESSING_FAILED',
-
-  // HTTP Client Errors (mapped from JobProcessingError subtypes)
-  HTTP_INTERNAL_SERVER_ERROR: 'HTTP_INTERNAL_SERVER_ERROR',
-  HTTP_BAD_GATEWAY: 'HTTP_BAD_GATEWAY',
-  HTTP_SERVICE_UNAVAILABLE: 'HTTP_SERVICE_UNAVAILABLE',
-  HTTP_GATEWAY_TIMEOUT: 'HTTP_GATEWAY_TIMEOUT',
 
   // Generic/Unknown SDK Error
   SDK_UNKNOWN_ERROR: 'SDK_UNKNOWN_ERROR',
@@ -45,6 +53,57 @@ export const JOBNIK_SDK_ERROR_CODES = {
  * @public
  */
 export type JobnikSDKErrorCode = (typeof JOBNIK_SDK_ERROR_CODES)[keyof typeof JOBNIK_SDK_ERROR_CODES];
+
+/**
+ * Base class for all Jobnik SDK errors.
+ * @public
+ */
+export class JobnikSDKError extends Error {
+  /**
+   * The name of the error, typically the class name.
+   * This overrides the default 'Error' name and makes it readonly.
+   * @override
+   * @public
+   * @readonly
+   */
+  public override readonly name: string;
+
+  /**
+   * A unique string code identifying the type of error.
+   * @public
+   * @readonly
+   */
+  public readonly errorCode: string;
+
+  /**
+   * Optional original error that caused this error.
+   * This overrides the standard 'cause' property from ES2022 Error and makes it readonly.
+   * @override
+   * @public
+   * @readonly
+   */
+  public override readonly cause?: unknown;
+
+  /**
+   * Creates an instance of JobnikSDKError.
+   * @param message - The error message.
+   * @param errorCode - A unique string code for this error type.
+   * @param cause - Optional original error.
+   */
+  public constructor(message: string, errorCode: string, cause?: unknown) {
+    super(message);
+
+    // Set the name of the error to the class name of the most derived constructor.
+    // This ensures that subclasses like NetworkError will have their 'name' property
+    // correctly set to 'NetworkError'.
+    this.name = new.target.name;
+    this.errorCode = errorCode;
+    this.cause = cause;
+
+    // Set the prototype explicitly to ensure 'instanceof' works correctly for custom errors.
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
 
 /**
  * Error class for network-related issues, such as connection problems or timeouts.
@@ -107,9 +166,16 @@ export class APIError extends JobnikSDKError {
    * @param errorCode - A specific job processing error code from {@link JOBNIK_SDK_ERROR_CODES}.
    * @param cause - Optional original error or server response data.
    */
-  public constructor(message: string, statusCode: number, errorCode: JobnikSDKErrorCode, cause?: unknown) {
+  public constructor(message: string, statusCode: number, errorCode: APIErrorCode, cause?: unknown) {
     super(message, errorCode, cause);
     this.statusCode = statusCode;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export class ProducerError extends JobnikSDKError {
+  public constructor(message: string, errorCode: APIErrorCode, cause?: unknown) {
+    super(message, errorCode, cause);
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
