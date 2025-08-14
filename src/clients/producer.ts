@@ -18,13 +18,67 @@ import { Logger } from '../types';
 import { createAPIErrorFromResponse } from '../errors/utils';
 import { JOBNIK_SDK_ERROR_CODES, ProducerError } from '../errors';
 
+/**
+ * Client for creating jobs, stages, and tasks in the job management system.
+ *
+ * @template JobTypes - Interface defining job types with their metadata and data schemas
+ * @template StageTypes - Interface defining stage types with their metadata, data, and task schemas
+ *
+ * @example
+ * ```typescript
+ * interface MyJobTypes {
+ *   'image-processing': {
+ *     userMetadata: { userId: string };
+ *     data: { imageUrl: string };
+ *   };
+ * }
+ *
+ * interface MyStageTypes {
+ *   'resize': {
+ *     userMetadata: { quality: number };
+ *     data: { width: number; height: number };
+ *     task: {
+ *       userMetadata: { batchId: string };
+ *       data: { sourceUrl: string };
+ *     };
+ *   };
+ * }
+ *
+ * const producer = new Producer<MyJobTypes, MyStageTypes>(apiClient, logger);
+ * ```
+ */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, StageTypes extends { [K in keyof StageTypes]: StageData } = {}> {
+  /**
+   * Creates a new Producer instance.
+   *
+   * @param apiClient - HTTP client for API communication
+   * @param logger - Logger instance for operation tracking
+   */
   public constructor(
     private readonly apiClient: ApiClient,
     private readonly logger: Logger
   ) {}
 
+  /**
+   * Creates a new job in the system.
+   *
+   * @template JobName - The job type name, must be a key from JobTypes
+   * @param jobData - Job configuration including name, metadata, and data
+   * @returns Promise resolving to the created job with assigned ID
+   *
+   * @throws {ProducerError} When job creation fails
+   *
+   * @example
+   * ```typescript
+   * const job = await producer.createJob({
+   *   name: 'image-processing',
+   *   userMetadata: { userId: 'user-123' },
+   *   data: { imageUrl: 'https://example.com/image.jpg' },
+   *   priority: 'HIGH'
+   * });
+   * ```
+   */
   public async createJob<JobName extends ValidJobName<JobTypes>>(
     jobData: NewJob<JobName, InferJobData<JobName, JobTypes>>
   ): Promise<Job<JobName, InferJobData<JobName, JobTypes>>> {
@@ -57,7 +111,7 @@ export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, 
           throw new ProducerError(
             `Failed to create job ${jobData.name}`,
             JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-            await createAPIErrorFromResponse(response, error)
+            createAPIErrorFromResponse(response, error)
           );
         }
 
@@ -80,6 +134,25 @@ export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, 
     );
   }
 
+  /**
+   * Creates a stage within an existing job.
+   *
+   * @template StageType - The stage type name, must be a key from StageTypes
+   * @param jobId - Branded job ID from a previously created job
+   * @param stageData - Stage configuration including type, metadata, and data
+   * @returns Promise resolving to the created stage with assigned ID
+   *
+   * @throws {ProducerError} When job retrieval fails, trace context extraction fails, or stage creation fails
+   *
+   * @example
+   * ```typescript
+   * const stage = await producer.createStage(jobId, {
+   *   type: 'resize',
+   *   userMetadata: { quality: 95 },
+   *   data: { width: 800, height: 600 }
+   * });
+   * ```
+   */
   public async createStage<StageType extends ValidStageType<StageTypes>>(
     jobId: JobId,
     stageData: NewStage<StageType, InferStageData<StageType, StageTypes>>
@@ -109,7 +182,7 @@ export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, 
           throw new ProducerError(
             `Failed to retrieve job ${jobId}`,
             JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-            await createAPIErrorFromResponse(jobResponse.response, jobResponse.error)
+            createAPIErrorFromResponse(jobResponse.response, jobResponse.error)
           );
         }
 
@@ -135,7 +208,7 @@ export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, 
           throw new ProducerError(
             `Failed to create stage for job ${jobId}`,
             JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-            await createAPIErrorFromResponse(response, error)
+            createAPIErrorFromResponse(response, error)
           );
         }
 
@@ -158,6 +231,31 @@ export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, 
     );
   }
 
+  /**
+   * Creates multiple tasks within an existing stage.
+   *
+   * @template StageType - The stage type name, must match the stage's actual type
+   * @param stageId - Branded stage ID from a previously created stage
+   * @param stageType - Stage type name for validation and typing
+   * @param taskData - Array of task configurations with metadata and data
+   * @returns Promise resolving to array of created tasks with assigned IDs
+   *
+   * @throws {ProducerError} When task data is empty, stage retrieval fails, stage type mismatch, trace context extraction fails, or task creation fails
+   *
+   * @example
+   * ```typescript
+   * const tasks = await producer.createTasks(stageId, 'resize', [
+   *   {
+   *     userMetadata: { batchId: 'batch-1' },
+   *     data: { sourceUrl: 'https://example.com/image1.jpg' }
+   *   },
+   *   {
+   *     userMetadata: { batchId: 'batch-1' },
+   *     data: { sourceUrl: 'https://example.com/image2.jpg' }
+   *   }
+   * ]);
+   * ```
+   */
   public async createTasks<StageType extends ValidStageType<StageTypes>>(
     stageId: StageId,
     stageType: StageType,
@@ -195,7 +293,7 @@ export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, 
           throw new ProducerError(
             `Failed to retrieve stage ${stageId}`,
             JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-            await createAPIErrorFromResponse(stageResponse.response, stageResponse.error)
+            createAPIErrorFromResponse(stageResponse.response, stageResponse.error)
           );
         }
 
@@ -245,7 +343,7 @@ export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, 
             throw new ProducerError(
               `Failed to create task for stage ${stageId}`,
               JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-              await createAPIErrorFromResponse(response, error)
+              createAPIErrorFromResponse(response, error)
             );
           }
 

@@ -1,11 +1,11 @@
 import { API_ERROR_CODES, APIError, APIErrorCode, JOBNIK_SDK_ERROR_CODES } from './sdkErrors';
 
-export async function createAPIErrorFromResponse(response: Response, apiError: { message: string; code: string }): Promise<APIError> {
+export function createAPIErrorFromResponse(response: Response, apiError: { message: string; code: string }): APIError {
   const cause = {
     headers: response.headers,
     url: response.url,
     status: response.status,
-    body: await response.text(),
+    // body: await clonedResponse.text(),
     error: apiError,
   };
   return new APIError(

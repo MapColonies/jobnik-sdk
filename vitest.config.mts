@@ -22,5 +22,6 @@ export default defineConfig({
       exclude: ['**/node_modules/**', '**/vendor/**'],
       reportOnFailure: true,
     },
+    setupFiles: ['./tests/utils/matchers.ts'],
   },
 });
