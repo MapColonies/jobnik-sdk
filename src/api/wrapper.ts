@@ -4,6 +4,7 @@ import type { FetchResponse, MaybeOptionalInit, Client } from 'openapi-fetch';
 import type { HttpMethod, MediaType, PathsWithMethod } from 'openapi-typescript-helpers';
 import { SpanStatusCode } from '@opentelemetry/api';
 import type { InitParam } from 'openapi-fetch/src/index.js';
+import { StatusCodes } from 'http-status-codes';
 import type { OpenAPIV3 } from 'openapi-types';
 import type { paths } from '../types';
 import { tracer } from '../telemetry/trace';
@@ -115,9 +116,16 @@ async function wrapWithSpan<
 
       //@ts-expect-error im not sure why typescript hates me here (╯°□°）╯︵ ┻━┻
       const result = await request(method, path, ...init);
-      span.setStatus({
-        code: SpanStatusCode.OK,
-      });
+
+      if (result.response.status < (StatusCodes.BAD_REQUEST as number)) {
+        span.setStatus({
+          code: SpanStatusCode.OK,
+        });
+      } else {
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+        });
+      }
 
       return result;
     } catch (error) {

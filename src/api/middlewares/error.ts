@@ -106,20 +106,6 @@ const handleHttpError = (originalError: unknown, context: ErrorContext): Error |
       );
 
     default:
-      // Handle other status codes by category
-      // if (statusCode >= statusCodes.BAD_REQUEST && statusCode < statusCodes.INTERNAL_SERVER_ERROR) {
-      //   return new BadRequestError(
-      //     `An error occurred while processing your request that returned 4xx error for ${method} ${url}`,
-      //     undefined,
-      //     originalError
-      //   );
-      // }
-
-      // if (statusCode >= statusCodes.INTERNAL_SERVER_ERROR) {
-      //   return new InternalServerError(`An error occurred while processing your request that returned 5xx error for ${method} ${url}`);
-      // }
-
-      // Unexpected status codes (2xx, 3xx should not reach here)
       return new NetworkError(`Unexpected status code ${statusCode} for ${method} ${url}`, JOBNIK_SDK_ERROR_CODES.NETWORK_UNKNOWN, originalError);
   }
 };
