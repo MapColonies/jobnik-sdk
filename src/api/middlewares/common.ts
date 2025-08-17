@@ -1,5 +1,3 @@
-import { components } from '../../types/openapi';
-
 const PATH_SEGMENT_MIN_COUNT = 2; // Minimum segments for resource extraction (e.g., /jobs/{id})
 
 export interface ErrorContext {

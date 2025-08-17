@@ -3,7 +3,6 @@ import { format, resolveConfig } from 'prettier';
 import { dereference } from '@apidevtools/json-schema-ref-parser';
 import type { OpenAPI3, OperationObject, ResponseObject, SchemaObject } from 'openapi-typescript';
 import openapiTS, { astToString } from 'openapi-typescript';
-import * as changeCase from 'change-case';
 import { factory } from 'typescript';
 
 const OPENAPI_PATH = 'openapi3.yaml';
@@ -51,15 +50,6 @@ async function createErrors(): Promise<void> {
     process.exit(1);
   }
 
-  function generateErrorClassName(code: string): string {
-    let className = changeCase.pascalCase(code);
-
-    if (!className.endsWith('Error')) {
-      className += 'Error';
-    }
-    return className;
-  }
-
   const errorCodes = new Set<string>();
 
   function extractCodeFromSchema(schema: SchemaObject): void {
@@ -95,27 +85,6 @@ async function createErrors(): Promise<void> {
         extractCodeFromSchema(subSchema as SchemaObject);
       }
     }
-  }
-
-  function createError(code: string): string {
-    const className = generateErrorClassName(code);
-
-    return `/**
- * Error class for ${className}.
- * @public
- */
-export class ${className} extends APIError {
-  /**
-   * Creates an instance of ${className}.
-   * @param message - The error message.
-   * @param statusCode - Optional status code from the API response.
-   * @param cause - Optional original error or server response data.
-   */
-  public constructor(message: string, statusCode: number, cause?: unknown) {
-    super(message, statusCode, ${code}, cause);
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}`;
   }
 
   for (const [, methods] of Object.entries(openapi.paths)) {

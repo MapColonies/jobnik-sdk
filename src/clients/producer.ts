@@ -1,8 +1,10 @@
-import { Span, SpanKind, SpanStatusCode, context, propagation, trace } from '@opentelemetry/api';
-import { ApiClient } from '../api';
-import { JobId, StageId } from '../types/brands';
-import { InferJobData, Job, JobData, NewJob, ValidJobName } from '../types/job';
-import { InferTaskData, NewTask, Task } from '../types/task';
+import { type Span, SpanKind, SpanStatusCode, context, propagation, trace } from '@opentelemetry/api';
+import type { ApiClient } from '../api';
+import type { components } from '../types/openapi';
+import type { JobId, StageId } from '../types/brands';
+import type { InferJobData, Job, JobData, NewJob, ValidJobName } from '../types/job';
+import type { InferStageData, NewStage, Stage, StageData, ValidStageType } from '../types/stage';
+import type { InferTaskData, NewTask, Task } from '../types/task';
 import { tracer, withSpan } from '../telemetry/trace';
 import {
   ATTR_JOB_MANAGER_JOB_NAME,
@@ -12,8 +14,6 @@ import {
   ATTR_MESSAGING_DESTINATION_NAME,
   ATTR_MESSAGING_MESSAGE_CONVERSATION_ID,
 } from '../telemetry/semconv';
-import { InferStageData, NewStage, Stage, StageData, ValidStageType } from '../types/stage';
-import { components } from '../types/openapi';
 import { Logger } from '../types';
 import { createAPIErrorFromResponse } from '../errors/utils';
 import { JOBNIK_SDK_ERROR_CODES, ProducerError } from '../errors';

@@ -1,4 +1,4 @@
-import { API_ERROR_CODES, APIError, APIErrorCode, JOBNIK_SDK_ERROR_CODES } from './sdkErrors';
+import { API_ERROR_CODES, APIError, APIErrorCode } from './sdkErrors';
 
 export function createAPIErrorFromResponse(response: Response, apiError: { message: string; code: string }): APIError {
   const cause = {

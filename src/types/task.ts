@@ -1,5 +1,5 @@
 import { components } from './openapi';
-import { StageData, StageTypesTemplate } from './stage';
+import { StageData } from './stage';
 import { Prettify } from './utils';
 
 type UserMetadata = components['schemas']['userMetadata'];
