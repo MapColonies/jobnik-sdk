@@ -117,8 +117,9 @@ describe('apiClient tracing', () => {
     mockPool.intercept({ path, method }).reply(400, 'Bad Request');
 
     await tracer.startActiveSpan('Test Span', async (span) => {
+      const shouldIncludeBody = !['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method);
       // @ts-expect-error we loop over all the methods, but typescript doesnt understand the keys
-      await apiClient[method](path, !['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method) ? { body: {} } : undefined);
+      await apiClient[method](path, shouldIncludeBody ? { body: {} } : undefined);
       span.end();
     });
 

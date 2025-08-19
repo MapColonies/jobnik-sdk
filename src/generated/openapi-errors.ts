@@ -1,4 +1,7 @@
-/* eslint-disable @typescript-eslint/naming-convention */
+// This file is auto-generated, do not edit manually
+// Run the command `npm run generate:openapi` to regenerate
+/* eslint-disable */
+
 export const API_ERRORS_MAP = {
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   DATABASE_RELATED_ERROR: 'DATABASE_RELATED_ERROR',
@@ -15,4 +18,3 @@ export const API_ERRORS_MAP = {
   TASK_STATUS_UPDATE_FAILED: 'TASK_STATUS_UPDATE_FAILED',
   ILLEGAL_TASK_STATUS_TRANSITION: 'ILLEGAL_TASK_STATUS_TRANSITION',
 } as const;
-/* eslint-enable @typescript-eslint/naming-convention */

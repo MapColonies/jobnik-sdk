@@ -5,8 +5,10 @@ import type { OpenAPI3, OperationObject, ResponseObject, SchemaObject } from 'op
 import openapiTS, { astToString } from 'openapi-typescript';
 import { factory } from 'typescript';
 
-const OPENAPI_PATH = 'openapi3.yaml';
+const OPENAPI_PATH = 'src/openapi3.yaml';
 const ESLINT_DISABLE = '/* eslint-disable */\n';
+const FILE_HEADER = `// This file is auto-generated, do not edit manually
+  // Run the command \`npm run generate:openapi\` to regenerate\n${ESLINT_DISABLE}`;
 
 const TYPES_DESTINATION_PATH = 'src/types/openapi.ts';
 const ERRORS_DESTINATION_PATH = 'src/generated/openapi-errors.ts';
@@ -33,13 +35,20 @@ async function createTypes(): Promise<void> {
 
   let content = astToString(ast);
 
-  content = ESLINT_DISABLE + content;
+  content = FILE_HEADER + content;
 
   content = await format(content, { ...prettierOptions, parser: 'typescript' });
 
   await fs.writeFile(TYPES_DESTINATION_PATH, content);
 
   console.log('Types generated successfully');
+}
+
+function buildErrorMapping(errorCodes: Set<string>): string {
+  return errorCodes
+    .values()
+    .map((code) => `'${code}': '${code}'`)
+    .reduce((acc, curr) => `${acc}, ${curr}`);
 }
 
 async function createErrors(): Promise<void> {
@@ -116,12 +125,8 @@ async function createErrors(): Promise<void> {
   // errorFile += errorCodes.values().map(createError).toArray().join('\n');
 
   let errorFile = `
-  /* eslint-disable @typescript-eslint/naming-convention */
-  export const API_ERRORS_MAP = { ${errorCodes
-    .values()
-    .map((code) => `'${code}': '${code}'`)
-    .reduce((acc, curr) => `${acc}, ${curr}`)} } as const;
-    /* eslint-enable @typescript-eslint/naming-convention */
+  ${FILE_HEADER}
+  export const API_ERRORS_MAP = { ${buildErrorMapping(errorCodes)} } as const;
 `;
 
   errorFile = await format(errorFile, { ...prettierOptions, parser: 'typescript' });
@@ -131,6 +136,4 @@ async function createErrors(): Promise<void> {
   console.log('Errors generated successfully');
 }
 
-await createTypes();
-
-await createErrors();
+await Promise.all([createTypes(), createErrors()]);

@@ -1,3 +1,5 @@
+// This file is auto-generated, do not edit manually
+// Run the command `npm run generate:openapi` to regenerate
 /* eslint-disable */
 import type { JobId, StageId, TaskId } from './brands';
 export type paths = {
