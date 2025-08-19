@@ -1,13 +1,9 @@
-// vitest.setup.ts
-
 import { expect } from 'vitest';
 
 expect.extend({
-  // The function is now an anonymous function defined inline
   toHaveCauseCode(received: unknown, expectedCode: string) {
     const { isNot, utils } = this;
 
-    // 1. Ensure the received value is an Error
     if (!(received instanceof Error)) {
       return {
         pass: false,
@@ -15,7 +11,6 @@ expect.extend({
       };
     }
 
-    // 2. Check for the 'cause' property
     if (!Object.hasOwn(received, 'cause') || typeof received.cause !== 'object' || received.cause === null) {
       return {
         pass: false,
@@ -24,7 +19,6 @@ expect.extend({
       };
     }
 
-    // 3. Check for the 'errorCode' property on the cause
     const cause = received.cause as { errorCode?: unknown };
     if (!Object.hasOwn(cause, 'errorCode')) {
       return {
@@ -36,7 +30,6 @@ expect.extend({
     const actualCode = cause.errorCode;
     const pass = actualCode === expectedCode;
 
-    // 4. Return the final result with helpful, color-coded messages
     return {
       pass,
       message: (): string =>
@@ -46,6 +39,3 @@ expect.extend({
     };
   },
 });
-
-// You could add other custom matchers here as well
-// anotherMatcher(this: MatcherContext, received: unknown) { /* ... */ }

@@ -10,9 +10,9 @@ import { ProducerError, API_ERROR_CODES } from '../../src/errors';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
-/* eslint-disable */
 // Add type declaration for global mockAgent
 declare global {
+  // eslint-disable-next-line no-var
   var mockAgentForTest: MockAgent;
 }
 
@@ -24,6 +24,7 @@ vi.mock('undici', async () => {
   return {
     ...originalModule,
     // Mock agent constructor to return our mockAgent
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     Agent: vi.fn().mockImplementation(() => {
       // We'll set this in the test
       return global.mockAgentForTest;
@@ -72,8 +73,6 @@ describe('Producer', () => {
   }
 
   beforeAll(() => {
-    console.log('before');
-
     mockAgent = new MockAgent();
     mockAgent.disableNetConnect();
     global.mockAgentForTest = mockAgent;

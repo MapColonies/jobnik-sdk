@@ -39,7 +39,6 @@ function handleHttpResponseError(response: Response, context: ErrorContext): voi
 
 export function createResponseMiddleware(): Exclude<Middleware['onResponse'], undefined> {
   return ({ request, response }) => {
-    // console.log('Inside response handling middleware', { request, response });
     const context: ErrorContext = {
       url: request.url,
       method: request.method,
