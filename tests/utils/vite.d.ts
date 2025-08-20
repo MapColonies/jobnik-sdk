@@ -1,5 +1,3 @@
-// import 'vitest';
-
 import { APIErrorCode } from '../../src/errors';
 
 interface CustomMatchers<R = unknown> {
