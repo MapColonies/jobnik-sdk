@@ -552,7 +552,9 @@ describe('Producer', () => {
         const response = producer.createTasks(stageId, stageType, taskData);
 
         await expect(response).rejects.toThrow(ProducerError);
-        await expect(response).rejects.toThrow('Stage type mismatch: expected processing, got different-type');
+        await expect(response).rejects.toThrow(
+          "Stage type mismatch for stage stage-123: server reports 'different-type', but client specified 'processing'"
+        );
       });
 
       it('should throw ProducerError when span context extraction fails', async () => {
