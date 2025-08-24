@@ -1,5 +1,3 @@
-import { components } from '../../types/openapi';
-
 const PATH_SEGMENT_MIN_COUNT = 2; // Minimum segments for resource extraction (e.g., /jobs/{id})
 
 export interface ErrorContext {
@@ -49,10 +47,10 @@ export const parseErrorResponse = async (response: Response, context: ErrorConte
     const responseText = await response.clone().text();
     if (responseText) {
       try {
-        const errorBody = JSON.parse(responseText) as components['schemas']['error'];
+        const errorBody = JSON.parse(responseText) as { message?: string };
 
         // Extract message from Job Manager Service error response format
-        if (errorBody.message && typeof errorBody.message === 'string') {
+        if (errorBody.message !== undefined && typeof errorBody.message === 'string') {
           errorMessage = `${errorMessage}: ${errorBody.message}`;
         }
       } catch {

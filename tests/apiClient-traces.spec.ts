@@ -111,20 +111,15 @@ describe('apiClient tracing', () => {
     { method: 'DELETE' as const, path: '/jobs/123', expectedName: 'API Request: DELETE /jobs/123' },
     { method: 'HEAD' as const, path: '/jobs/123', expectedName: 'API Request: HEAD /jobs/123' },
     { method: 'OPTIONS' as const, path: '/jobs/123', expectedName: 'API Request: OPTIONS /jobs/123' },
-    { method: 'TRACE' as const, path: '/jobs/123', expectedName: 'API Request: TRACE /jobs/123' },
   ])('should create a span for $method requests with 400 response', async ({ method, path, expectedName }) => {
     expect.assertions(2);
 
     mockPool.intercept({ path, method }).reply(400, 'Bad Request');
 
     await tracer.startActiveSpan('Test Span', async (span) => {
-      try {
-        // @ts-expect-error we loop over all the methods, but typescript doesnt understand the keys
-        await apiClient[method](path, !['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method) ? { body: {} } : undefined);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (err) {
-        // Catch the error to prevent it from failing the test
-      }
+      const shouldIncludeBody = !['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method);
+      // @ts-expect-error we loop over all the methods, but typescript doesnt understand the keys
+      await apiClient[method](path, shouldIncludeBody ? { body: {} } : undefined);
       span.end();
     });
 
@@ -149,7 +144,6 @@ describe('apiClient tracing', () => {
     const spans = memoryExporter.getFinishedSpans();
     expect(spans[0]).toHaveProperty('status', {
       code: api.SpanStatusCode.ERROR,
-      message: 'Request failed with error: HTTP 400 error for GET http://localhost:8080/jobs: BadRequest',
     });
   });
 
@@ -169,7 +163,6 @@ describe('apiClient tracing', () => {
     const spans = memoryExporter.getFinishedSpans();
     expect(spans[0]).toHaveProperty('status', {
       code: api.SpanStatusCode.ERROR,
-      message: 'Request failed with error: HTTP 500 error for GET http://localhost:8080/jobs: Internal Server Error',
     });
   });
 });

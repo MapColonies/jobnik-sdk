@@ -8,6 +8,11 @@ if (process.env.GITHUB_ACTIONS) {
 
 export default defineConfig({
   test: {
+    typecheck: {
+      enabled: true,
+      tsconfig: 'tsconfig.json',
+      ignoreSourceErrors: true,
+    },
     reporters,
     include: ['tests/**/*.spec.ts'],
     coverage: {
@@ -17,5 +22,6 @@ export default defineConfig({
       exclude: ['**/node_modules/**', '**/vendor/**'],
       reportOnFailure: true,
     },
+    setupFiles: ['./tests/utils/matchers.ts'],
   },
 });

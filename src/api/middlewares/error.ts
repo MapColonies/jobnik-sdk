@@ -1,14 +1,6 @@
 import type { Middleware } from 'openapi-fetch';
 import statusCodes from 'http-status-codes';
-import {
-  NetworkError,
-  BadRequestError,
-  InternalServerError,
-  JOBNIK_SDK_ERROR_CODES,
-  BadGatewayError,
-  GatewayTimeoutError,
-  ServiceUnavailableError,
-} from '../../errors/sdkErrors';
+import { NetworkError, JOBNIK_SDK_ERROR_CODES, APIError } from '../../errors/sdkErrors';
 import { ErrorContext } from './common';
 
 function isObjectWithMessage(error: unknown): error is { message: string } {
@@ -89,27 +81,25 @@ const handleHttpError = (originalError: unknown, context: ErrorContext): Error |
   switch (statusCode) {
     // Infrastructure errors that can occur even if not in OpenAPI spec
     case statusCodes.BAD_GATEWAY:
-      return new BadGatewayError(`Service temporarily unavailable for ${method} ${url}. Please retry later.`, undefined, originalError);
+      return new APIError(
+        `Service temporarily unavailable for ${method} ${url}. Please retry later.`,
+        statusCodes.BAD_GATEWAY,
+        JOBNIK_SDK_ERROR_CODES.HTTP_BAD_GATEWAY
+      );
     case statusCodes.SERVICE_UNAVAILABLE:
-      return new ServiceUnavailableError(`Service temporarily unavailable for ${method} ${url}. Please retry later.`, undefined, originalError);
+      return new APIError(
+        `Service temporarily unavailable for ${method} ${url}. Please retry later.`,
+        statusCodes.SERVICE_UNAVAILABLE,
+        JOBNIK_SDK_ERROR_CODES.HTTP_SERVICE_UNAVAILABLE
+      );
     case statusCodes.GATEWAY_TIMEOUT:
-      return new GatewayTimeoutError(`Service temporarily unavailable for ${method} ${url}. Please retry later.`, undefined, originalError);
+      return new APIError(
+        `Service temporarily unavailable for ${method} ${url}. Please retry later.`,
+        statusCodes.GATEWAY_TIMEOUT,
+        JOBNIK_SDK_ERROR_CODES.HTTP_GATEWAY_TIMEOUT
+      );
 
     default:
-      // Handle other status codes by category
-      if (statusCode >= statusCodes.BAD_REQUEST && statusCode < statusCodes.INTERNAL_SERVER_ERROR) {
-        return new BadRequestError(
-          `An error occurred while processing your request that returned 4xx error for ${method} ${url}`,
-          undefined,
-          originalError
-        );
-      }
-
-      if (statusCode >= statusCodes.INTERNAL_SERVER_ERROR) {
-        return new InternalServerError(`An error occurred while processing your request that returned 5xx error for ${method} ${url}`);
-      }
-
-      // Unexpected status codes (2xx, 3xx should not reach here)
       return new NetworkError(`Unexpected status code ${statusCode} for ${method} ${url}`, JOBNIK_SDK_ERROR_CODES.NETWORK_UNKNOWN, originalError);
   }
 };
