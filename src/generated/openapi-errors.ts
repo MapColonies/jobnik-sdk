@@ -1,6 +1,6 @@
-// This file is auto-generated, do not edit manually
-// Run the command `npm run generate:openapi` to regenerate
 /* eslint-disable */
+// This file was auto-generated. Do not edit manually.
+// To update, run the error generation script again.
 
 export const API_ERRORS_MAP = {
   VALIDATION_ERROR: 'VALIDATION_ERROR',

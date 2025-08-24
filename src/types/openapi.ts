@@ -1,6 +1,7 @@
-// This file is auto-generated, do not edit manually
-// Run the command `npm run generate:openapi` to regenerate
 /* eslint-disable */
+// This file was auto-generated. Do not edit manually.
+// To update, run the error generation script again.
+
 import type { JobId, StageId, TaskId } from './brands';
 export type paths = {
   '/jobs': {
