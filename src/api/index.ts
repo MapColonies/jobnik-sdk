@@ -10,6 +10,7 @@ type Prettify<T> = {
 } & {};
 
 export type ApiClient = Prettify<Client<paths>>;
+export type ScopedApiClient = Prettify<Client<Omit<paths, '/stages/{stageType}/tasks/dequeue' | '/tasks/{taskId}/status'>>>;
 
 export function createApiClient(baseUrl: string, httpClientOptions: HttpClientOptions = {}): ApiClient {
   const client = createClient<paths>({
