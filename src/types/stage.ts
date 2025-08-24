@@ -29,7 +29,7 @@ export type Stage<StageType extends string, StageInfo extends StageData = StageD
 export type NewStage<StageType extends string, StageInfo extends StageData = StageData> = Prettify<
   Omit<components['schemas']['createStagePayload'], StageGenericProperties | 'tracestate' | 'traceparent'> & {
     type: StageType;
-    userMetadata: StageInfo['userMetadata'];
+    userMetadata?: StageInfo['userMetadata'];
     data: StageInfo['data'];
   }
 >;

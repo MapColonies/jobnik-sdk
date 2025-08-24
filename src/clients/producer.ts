@@ -18,6 +18,8 @@ import { Logger } from '../types';
 import { createAPIErrorFromResponse } from '../errors/utils';
 import { JOBNIK_SDK_ERROR_CODES, ProducerError } from '../errors';
 
+const DEFAULT_PRIORITY: Extract<components['schemas']['priority'], 'MEDIUM'> = 'MEDIUM';
+
 /**
  * Client for creating jobs, stages, and tasks in the job management system.
  *
@@ -87,7 +89,7 @@ export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, 
     this.logger.debug('Starting job creation', {
       operation: 'createJob',
       jobName: jobData.name,
-      priority: jobData.priority ?? 'MEDIUM',
+      priority: jobData.priority ?? DEFAULT_PRIORITY,
     });
 
     return withSpan(
@@ -95,7 +97,7 @@ export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, 
       {
         attributes: {
           [ATTR_JOB_MANAGER_JOB_NAME]: jobData.name,
-          [ATTR_JOB_MANAGER_JOB_PRIORITY]: jobData.priority ?? 'MEDIUM',
+          [ATTR_JOB_MANAGER_JOB_PRIORITY]: jobData.priority ?? DEFAULT_PRIORITY,
         },
         kind: SpanKind.CLIENT,
       },
@@ -298,16 +300,15 @@ export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, 
         }
 
         if (stageResponse.data.type !== stageType) {
-          // Log stage type mismatch as it's a validation error that could help debugging
-          this.logger.debug('Stage type mismatch detected', {
+          this.logger.debug('Stage type validation failed - mismatch detected', {
             operation: 'createTasks',
             stageId,
-            expected: stageType,
-            actual: stageResponse.data.type,
+            clientSpecified: stageType,
+            serverReported: stageResponse.data.type,
           });
 
           throw new ProducerError(
-            `Stage type mismatch: expected ${stageType}, got ${stageResponse.data.type}`,
+            `Stage type mismatch for stage ${stageId}: server reports '${stageResponse.data.type}', but client specified '${stageType}'`,
             JOBNIK_SDK_ERROR_CODES.STAGE_TYPE_MISMATCH_ERROR
           );
         }

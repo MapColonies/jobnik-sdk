@@ -25,7 +25,7 @@ export type Task<TaskInfo extends TaskData = TaskData> = Prettify<
 
 export type NewTask<TaskInfo extends TaskData = TaskData> = Prettify<
   Omit<components['schemas']['createTaskPayload'], TaskGenericProperties | 'tracestate' | 'traceparent'> & {
-    userMetadata: TaskInfo['userMetadata'];
+    userMetadata?: TaskInfo['userMetadata'];
     data: TaskInfo['data'];
   }
 >;
