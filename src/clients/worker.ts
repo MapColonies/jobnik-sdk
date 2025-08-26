@@ -147,7 +147,9 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
 
           await this.taskHandlerCircuitBreaker.fire(task, taskContext);
           this.logger.debug('Task handler succeeded', { taskId: task.id, stageType: this.stageType });
-          await this.markTask('COMPLETED', { task: task as Task });
+          await this.markTask('COMPLETED', { task: task, taskId: undefined });
+          span.setStatus({ code: SpanStatusCode.OK });
+          span.end();
         } catch (error) {
           this.logger.warn('Task handler failed', {
             taskId: task.id,
@@ -155,7 +157,7 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
             error: getErrorMessageFromUnknown(error),
           });
 
-          const [err] = await presult(this.markTaskFailed(task.id));
+          const [err] = await presult(this.markTask('FAILED', { task: task, taskId: undefined }));
 
           if (err) {
             this.logger.error('Error occurred while marking task as failed', {
