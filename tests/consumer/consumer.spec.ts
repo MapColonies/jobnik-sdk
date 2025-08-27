@@ -5,8 +5,9 @@ import { MockAgent, MockPool } from 'undici';
 import { createApiClient } from '../../src/api/index';
 import { Consumer } from '../../src/clients/consumer';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
-import { TaskId } from '../../src/types/brands';
+import { StageId, TaskId } from '../../src/types/brands';
 import { ConsumerError, API_ERROR_CODES } from '../../src/errors';
+import { Task } from '../../src/types/task';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
@@ -30,6 +31,29 @@ vi.mock('undici', async () => {
     }),
   };
 });
+
+function createMockTaskResponse(override: Partial<Task> = {}): Task {
+  const defaultTask: Task = {
+    id: 'task-123' as TaskId,
+    stageId: 'stage-456' as StageId,
+    userMetadata: { batchId: 'batch-1' },
+    data: { sourceUrl: 'https://example.com/image.jpg', targetUrl: 'https://example.com/resized.jpg' },
+    status: 'IN_PROGRESS',
+    attempts: 1,
+    maxAttempts: 5,
+    creationTime: new Date().toISOString(),
+    updateTime: new Date().toISOString(),
+    traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+    tracestate: 'vendor=test',
+  };
+
+  return {
+    ...defaultTask,
+    ...override,
+    // Ensure userMetadata is always defined unless explicitly overridden with undefined
+    userMetadata: override.userMetadata !== undefined ? override.userMetadata : defaultTask.userMetadata,
+  };
+}
 
 describe('Consumer', () => {
   let mockAgent: MockAgent;
@@ -90,18 +114,7 @@ describe('Consumer', () => {
 
     describe('successful task dequeue', () => {
       it('should dequeue a task successfully', async () => {
-        const mockTaskResponse = {
-          id: 'task-123',
-          stageId: 'stage-456',
-          userMetadata: { batchId: 'batch-1' },
-          data: { sourceUrl: 'https://example.com/image.jpg', targetUrl: 'https://example.com/resized.jpg' },
-          status: 'IN_PROGRESS',
-          attempts: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
-          tracestate: 'vendor=test',
-        };
+        const mockTaskResponse = createMockTaskResponse();
 
         mockPool
           .intercept({
@@ -115,9 +128,6 @@ describe('Consumer', () => {
         const result = await consumer.dequeueTask(stageType);
 
         expect(result).toEqual(mockTaskResponse);
-        expect(result!.id).toBe('task-123');
-        expect(result!.status).toBe('IN_PROGRESS');
-        expect(result!.attempts).toBe(1);
       });
 
       it('should return null when no tasks are available', async () => {
@@ -145,16 +155,9 @@ describe('Consumer', () => {
       it('should dequeue typed tasks with custom generics', async () => {
         const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger);
 
-        const mockTaskResponse = {
-          id: 'task-typed-123',
-          stageId: 'stage-456',
-          userMetadata: { batchId: 'batch-1' },
-          data: { sourceUrl: 'https://example.com/image.jpg', targetUrl: 'https://example.com/resized.jpg' },
-          status: 'IN_PROGRESS',
-          attempts: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+        const mockTaskResponse = createMockTaskResponse({
+          id: 'task-typed-123' as TaskId,
+        });
 
         mockPool
           .intercept({
@@ -168,8 +171,6 @@ describe('Consumer', () => {
         const result = await typedConsumer.dequeueTask('image-resize');
 
         expect(result).toEqual(mockTaskResponse);
-        expect(result!.data.sourceUrl).toBe('https://example.com/image.jpg');
-        expect(result!.data.targetUrl).toBe('https://example.com/resized.jpg');
       });
     });
 
@@ -226,18 +227,9 @@ describe('Consumer', () => {
     describe('successful task completion', () => {
       it('should mark a task as completed successfully', async () => {
         // Mock GET /tasks/{taskId} for task retrieval
-        const mockTaskResponse = {
+        const mockTaskResponse = createMockTaskResponse({
           id: taskId,
-          stageId: 'stage-456',
-          userMetadata: { batchId: 'batch-1' },
-          data: { sourceUrl: 'https://example.com/image.jpg', targetUrl: 'https://example.com/resized.jpg' },
-          status: 'IN_PROGRESS',
-          attempts: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
-          tracestate: 'vendor=test',
-        };
+        });
 
         mockPool
           .intercept({
@@ -287,18 +279,10 @@ describe('Consumer', () => {
 
       it('should throw ConsumerError when task is not in IN_PROGRESS state', async () => {
         // Mock GET /tasks/{taskId} with wrong status
-        const mockTaskResponse = {
+        const mockTaskResponse = createMockTaskResponse({
           id: taskId,
-          stageId: 'stage-456',
-          userMetadata: { batchId: 'batch-1' },
-          data: { sourceUrl: 'https://example.com/image.jpg', targetUrl: 'https://example.com/resized.jpg' },
           status: 'COMPLETED', // Wrong status for completion
-          attempts: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
-          tracestate: 'vendor=test',
-        };
+        });
 
         mockPool
           .intercept({
@@ -312,23 +296,19 @@ describe('Consumer', () => {
         const response = consumer.markTaskCompleted(taskId);
 
         await expect(response).rejects.toThrow(ConsumerError);
-        await expect(response).rejects.toThrow(`Cannot mark task ${taskId} as completed: task is in COMPLETED state, expected IN_PROGRESS`);
+        await expect(response).rejects.toThrow(`Cannot mark task ${taskId} as COMPLETED: task is in COMPLETED state, expected IN_PROGRESS state`);
       });
 
       it('should throw ConsumerError when span context extraction fails', async () => {
         vi.spyOn(trace, 'getSpanContext').mockReturnValue(undefined);
 
         // Mock GET /tasks/{taskId} without trace context
-        const mockTaskResponse = {
+        const mockTaskResponse = createMockTaskResponse({
           id: taskId,
-          stageId: 'stage-456',
-          userMetadata: { batchId: 'batch-1' },
-          data: { sourceUrl: 'https://example.com/image.jpg', targetUrl: 'https://example.com/resized.jpg' },
-          status: 'IN_PROGRESS',
-          attempts: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+          // Remove trace context to trigger the error
+          traceparent: undefined,
+          tracestate: undefined,
+        });
 
         mockPool
           .intercept({
@@ -387,24 +367,15 @@ describe('Consumer', () => {
         const response = consumer.markTaskCompleted(taskId);
 
         await expect(response).rejects.toThrow(ConsumerError);
-        await expect(response).rejects.toThrow(`Failed to mark task ${taskId} as completed`);
+        await expect(response).rejects.toThrow(`Failed to mark task ${taskId} as COMPLETED`);
         await expect(response).rejects.toHaveCauseCode(API_ERROR_CODES.VALIDATION_ERROR);
       });
 
       it('should throw ConsumerError when server rejects status update with ILLEGAL_TASK_STATUS_TRANSITION', async () => {
         // Mock successful task retrieval
-        const mockTaskResponse = {
+        const mockTaskResponse = createMockTaskResponse({
           id: taskId,
-          stageId: 'stage-456',
-          userMetadata: { batchId: 'batch-1' },
-          data: { sourceUrl: 'https://example.com/image.jpg', targetUrl: 'https://example.com/resized.jpg' },
-          status: 'IN_PROGRESS',
-          attempts: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
-          tracestate: 'vendor=test',
-        };
+        });
 
         mockPool
           .intercept({
@@ -433,7 +404,7 @@ describe('Consumer', () => {
         const response = consumer.markTaskCompleted(taskId);
 
         await expect(response).rejects.toThrow(ConsumerError);
-        await expect(response).rejects.toThrow(`Failed to mark task ${taskId} as completed`);
+        await expect(response).rejects.toThrow(`Failed to mark task ${taskId} as COMPLETED`);
         await expect(response).rejects.toHaveCauseCode(API_ERROR_CODES.ILLEGAL_TASK_STATUS_TRANSITION);
       });
     });
@@ -445,18 +416,10 @@ describe('Consumer', () => {
     describe('successful task failure marking', () => {
       it('should mark a task as failed successfully', async () => {
         // Mock GET /tasks/{taskId} for task retrieval
-        const mockTaskResponse = {
+        const mockTaskResponse = createMockTaskResponse({
           id: taskId,
-          stageId: 'stage-456',
-          userMetadata: { batchId: 'batch-1' },
-          data: { sourceUrl: 'https://example.com/image.jpg', targetUrl: 'https://example.com/resized.jpg' },
-          status: 'IN_PROGRESS',
           attempts: 2,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
-          tracestate: 'vendor=test',
-        };
+        });
 
         mockPool
           .intercept({
@@ -506,18 +469,10 @@ describe('Consumer', () => {
 
       it('should throw ConsumerError when task is not in IN_PROGRESS state', async () => {
         // Mock GET /tasks/{taskId} with wrong status
-        const mockTaskResponse = {
+        const mockTaskResponse = createMockTaskResponse({
           id: taskId,
-          stageId: 'stage-456',
-          userMetadata: { batchId: 'batch-1' },
-          data: { sourceUrl: 'https://example.com/image.jpg', targetUrl: 'https://example.com/resized.jpg' },
           status: 'FAILED', // Wrong status for failure marking
-          attempts: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
-          tracestate: 'vendor=test',
-        };
+        });
 
         mockPool
           .intercept({
@@ -531,23 +486,19 @@ describe('Consumer', () => {
         const response = consumer.markTaskFailed(taskId);
 
         await expect(response).rejects.toThrow(ConsumerError);
-        await expect(response).rejects.toThrow(`Cannot mark task ${taskId} as failed: task is in FAILED state, expected IN_PROGRESS`);
+        await expect(response).rejects.toThrow(`Cannot mark task ${taskId} as FAILED: task is in FAILED state, expected IN_PROGRESS state`);
       });
 
       it('should throw ConsumerError when span context extraction fails', async () => {
         vi.spyOn(trace, 'getSpanContext').mockReturnValue(undefined);
 
         // Mock GET /tasks/{taskId} without trace context
-        const mockTaskResponse = {
+        const mockTaskResponse = createMockTaskResponse({
           id: taskId,
-          stageId: 'stage-456',
-          userMetadata: { batchId: 'batch-1' },
-          data: { sourceUrl: 'https://example.com/image.jpg', targetUrl: 'https://example.com/resized.jpg' },
-          status: 'IN_PROGRESS',
-          attempts: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+          // Remove trace context to trigger the error
+          traceparent: undefined,
+          tracestate: undefined,
+        });
 
         mockPool
           .intercept({
@@ -606,24 +557,15 @@ describe('Consumer', () => {
         const response = consumer.markTaskFailed(taskId);
 
         await expect(response).rejects.toThrow(ConsumerError);
-        await expect(response).rejects.toThrow(`Failed to mark task ${taskId} as failed`);
+        await expect(response).rejects.toThrow(`Failed to mark task ${taskId} as FAILED`);
         await expect(response).rejects.toHaveCauseCode(API_ERROR_CODES.VALIDATION_ERROR);
       });
 
       it('should throw ConsumerError when server rejects status update with ILLEGAL_TASK_STATUS_TRANSITION', async () => {
         // Mock successful task retrieval
-        const mockTaskResponse = {
+        const mockTaskResponse = createMockTaskResponse({
           id: taskId,
-          stageId: 'stage-456',
-          userMetadata: { batchId: 'batch-1' },
-          data: { sourceUrl: 'https://example.com/image.jpg', targetUrl: 'https://example.com/resized.jpg' },
-          status: 'IN_PROGRESS',
-          attempts: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
-          tracestate: 'vendor=test',
-        };
+        });
 
         mockPool
           .intercept({
@@ -652,7 +594,7 @@ describe('Consumer', () => {
         const response = consumer.markTaskFailed(taskId);
 
         await expect(response).rejects.toThrow(ConsumerError);
-        await expect(response).rejects.toThrow(`Failed to mark task ${taskId} as failed`);
+        await expect(response).rejects.toThrow(`Failed to mark task ${taskId} as FAILED`);
         await expect(response).rejects.toHaveCauseCode(API_ERROR_CODES.ILLEGAL_TASK_STATUS_TRANSITION);
       });
     });
@@ -664,21 +606,15 @@ describe('Consumer', () => {
       const stageType = 'image-resize';
 
       // Step 1: Dequeue Task
-      const mockTaskResponse = {
-        id: 'task-workflow-123',
-        stageId: 'stage-workflow-456',
+      const mockTaskResponse = createMockTaskResponse({
+        id: 'task-workflow-123' as TaskId,
+        stageId: 'stage-workflow-456' as StageId,
         userMetadata: { batchId: 'batch-workflow-1' },
         data: {
           sourceUrl: 'https://example.com/workflow-image.jpg',
           targetUrl: 'https://example.com/workflow-resized.jpg',
         },
-        status: 'IN_PROGRESS',
-        attempts: 1,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
-        tracestate: 'vendor=test',
-      };
+      });
 
       mockPool
         .intercept({
@@ -691,7 +627,7 @@ describe('Consumer', () => {
 
       const task = await typedConsumer.dequeueTask(stageType);
       expect(task).toEqual(mockTaskResponse);
-      expect(task!.status).toBe('IN_PROGRESS');
+      expect(task).toHaveProperty('status', 'IN_PROGRESS');
 
       // Step 2: Mark Task as Completed
       const taskId = task!.id as TaskId;
@@ -719,9 +655,15 @@ describe('Consumer', () => {
       await expect(typedConsumer.markTaskCompleted(taskId)).resolves.toBeUndefined();
 
       // Verify the workflow data integrity
-      expect(task!.data.sourceUrl).toBe('https://example.com/workflow-image.jpg');
-      expect(task!.data.targetUrl).toBe('https://example.com/workflow-resized.jpg');
-      expect(task!.userMetadata.batchId).toBe('batch-workflow-1');
+      expect(task).toMatchObject({
+        data: {
+          sourceUrl: 'https://example.com/workflow-image.jpg',
+          targetUrl: 'https://example.com/workflow-resized.jpg',
+        },
+        userMetadata: {
+          batchId: 'batch-workflow-1',
+        },
+      });
     });
 
     it('should handle a complete task processing workflow: dequeue -> fail', async () => {
@@ -729,21 +671,16 @@ describe('Consumer', () => {
       const stageType = 'data-transform';
 
       // Step 1: Dequeue Task
-      const mockTaskResponse = {
-        id: 'task-fail-workflow-123',
-        stageId: 'stage-fail-workflow-456',
+      const mockTaskResponse = createMockTaskResponse({
+        id: 'task-fail-workflow-123' as TaskId,
+        stageId: 'stage-fail-workflow-456' as StageId,
         userMetadata: { rowId: 'row-123' },
         data: {
           inputData: { name: 'John', age: 30 },
           transformRules: ['normalize', 'validate'],
         },
-        status: 'IN_PROGRESS',
         attempts: 2,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
-        tracestate: 'vendor=test',
-      };
+      });
 
       mockPool
         .intercept({
@@ -756,7 +693,6 @@ describe('Consumer', () => {
 
       const task = await typedConsumer.dequeueTask(stageType);
       expect(task).toEqual(mockTaskResponse);
-      expect(task!.attempts).toBe(2);
 
       // Step 2: Mark Task as Failed (simulating processing failure)
       const taskId = task!.id as TaskId;
@@ -784,9 +720,15 @@ describe('Consumer', () => {
       await expect(typedConsumer.markTaskFailed(taskId)).resolves.toBeUndefined();
 
       // Verify the workflow data integrity
-      expect(task!.data.inputData).toEqual({ name: 'John', age: 30 });
-      expect(task!.data.transformRules).toEqual(['normalize', 'validate']);
-      expect(task!.userMetadata.rowId).toBe('row-123');
+      expect(task).toMatchObject({
+        data: {
+          inputData: { name: 'John', age: 30 },
+          transformRules: ['normalize', 'validate'],
+        },
+        userMetadata: {
+          rowId: 'row-123',
+        },
+      });
     });
 
     it('should handle no tasks available gracefully in workflow', async () => {
@@ -811,27 +753,17 @@ describe('Consumer', () => {
 
       const task = await consumer.dequeueTask(stageType);
       expect(task).toBeNull();
-
-      // Workflow should handle this gracefully without errors
-      // In a real application, this would typically trigger a wait/retry mechanism
     });
 
     it('should handle typed consumer with type safety', async () => {
       const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger);
 
-      // This should provide proper TypeScript type checking
-      // The test verifies that the generic types work correctly
-
-      const mockImageTask = {
-        id: 'task-typed-image',
-        stageId: 'stage-typed',
+      const mockImageTask = createMockTaskResponse({
+        id: 'task-typed-image' as TaskId,
+        stageId: 'stage-typed' as StageId,
         userMetadata: { batchId: 'batch-typed' },
         data: { sourceUrl: 'https://example.com/typed.jpg', targetUrl: 'https://example.com/typed-resized.jpg' },
-        status: 'IN_PROGRESS',
-        attempts: 1,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      });
 
       mockPool
         .intercept({
@@ -844,10 +776,15 @@ describe('Consumer', () => {
 
       const result = await typedConsumer.dequeueTask('image-resize');
 
-      // TypeScript should enforce the correct types here
-      expect(result!.data.sourceUrl).toBe('https://example.com/typed.jpg');
-      expect(result!.data.targetUrl).toBe('https://example.com/typed-resized.jpg');
-      expect(result!.userMetadata.batchId).toBe('batch-typed');
+      expect(result).toMatchObject({
+        data: {
+          sourceUrl: 'https://example.com/typed.jpg',
+          targetUrl: 'https://example.com/typed-resized.jpg',
+        },
+        userMetadata: {
+          batchId: 'batch-typed',
+        },
+      });
     });
   });
 });

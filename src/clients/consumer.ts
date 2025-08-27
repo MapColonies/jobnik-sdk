@@ -42,8 +42,8 @@ export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } 
    * @param logger - Logger instance for operation tracking
    */
   public constructor(
-    private readonly apiClient: ApiClient,
-    private readonly logger: Logger
+    protected readonly apiClient: ApiClient,
+    protected readonly logger: Logger
   ) {}
 
   /**
@@ -148,40 +148,7 @@ export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } 
    * ```
    */
   public async markTaskCompleted(taskId: TaskId): Promise<void> {
-    const startTime = performance.now();
-
-    this.logger.debug('Marking task as completed', {
-      operation: 'markTaskCompleted',
-      taskId,
-    });
-
-    return withSpan(
-      'update_status',
-      {
-        attributes: {
-          [ATTR_MESSAGING_MESSAGE_ID]: taskId,
-          [JOB_MANAGER_TASK_STATUS]: 'COMPLETED',
-        },
-        kind: SpanKind.CLIENT,
-      },
-      this.logger,
-      async (span) => {
-        // Fetch task for validation and trace context
-        const taskResponse = await this.apiClient.GET('/tasks/{taskId}', {
-          params: { path: { taskId } },
-        });
-
-        if (taskResponse.error !== undefined) {
-          throw new ConsumerError(
-            `Failed to retrieve task ${taskId} for status update`,
-            JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-            createAPIErrorFromResponse(taskResponse.response, taskResponse.error)
-          );
-        }
-
-        await this.markTaskCompletedWithTask(taskResponse.data, span, startTime);
-      }
-    );
+    await this.markTask('COMPLETED', { taskId, task: undefined });
   }
 
   /**
@@ -199,151 +166,110 @@ export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } 
    * ```
    */
   public async markTaskFailed(taskId: TaskId): Promise<void> {
+    await this.markTask('FAILED', { taskId, task: undefined });
+  }
+
+  /**
+   * Marks a task with the specified status and updates it via the API.
+   *
+   * This method validates that the task is in the correct state (IN_PROGRESS) before
+   * allowing the status update. It also extracts and links trace context for distributed
+   * tracing, and logs the operation with performance metrics.
+   *
+   * @param status - The new status to set for the task
+   * @param options - Either an object containing the task data directly, or an object containing the taskId to fetch
+   * @param options.task - The task object to update (when taskId is undefined)
+   * @param options.taskId - The ID of the task to fetch and update (when task is undefined)
+   *
+   * @throws {ConsumerError} When trace context extraction fails
+   * @throws {ConsumerError} When task is not in IN_PROGRESS state
+   * @throws {ConsumerError} When the API request to update task status fails
+   *
+   * @returns A promise that resolves when the task status has been successfully updated
+   */
+  protected async markTask(
+    status: components['schemas']['taskOperationStatus'],
+    options: { task: Task; taskId: undefined } | { taskId: TaskId; task: undefined }
+  ): Promise<void> {
     const startTime = performance.now();
 
-    this.logger.debug('Marking task as failed', {
-      operation: 'markTaskFailed',
-      taskId,
+    this.logger.debug(`Marking task as ${status}`, {
+      taskId: options.taskId ?? options.task.id,
     });
 
     return withSpan(
       'update_status',
       {
         attributes: {
-          [ATTR_MESSAGING_MESSAGE_ID]: taskId,
-          [JOB_MANAGER_TASK_STATUS]: 'FAILED',
+          [ATTR_MESSAGING_MESSAGE_ID]: options.taskId ?? options.task.id,
+          [JOB_MANAGER_TASK_STATUS]: status,
         },
         kind: SpanKind.CLIENT,
       },
       this.logger,
       async (span) => {
-        // Fetch task for validation and trace context
-        const taskResponse = await this.apiClient.GET('/tasks/{taskId}', {
-          params: { path: { taskId } },
-        });
+        const task = options.taskId !== undefined ? await this.fetchTaskForUpdate(options.taskId) : options.task;
 
-        if (taskResponse.error !== undefined) {
+        // Extract trace context and link to original create span
+        const remoteContext = propagation.extract(context.active(), task);
+        const taskSpanContext = trace.getSpanContext(remoteContext);
+
+        if (!taskSpanContext) {
+          throw new ConsumerError(`Failed to extract span context for task ${task.id}`, JOBNIK_SDK_ERROR_CODES.TRACE_CONTEXT_EXTRACT_ERROR);
+        }
+
+        // Validate task is in correct state for update
+        if (task.status !== 'IN_PROGRESS') {
           throw new ConsumerError(
-            `Failed to retrieve task ${taskId} for status update`,
-            JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-            createAPIErrorFromResponse(taskResponse.response, taskResponse.error)
+            `Cannot mark task ${task.id} as ${status}: task is in ${task.status} state, expected IN_PROGRESS state`,
+            JOBNIK_SDK_ERROR_CODES.TASK_INVALID_STATE_TRANSITION
           );
         }
 
-        await this.markTaskFailedWithTask(taskResponse.data, span, startTime);
+        span.addLink({
+          context: taskSpanContext,
+        });
+
+        const { error, response } = await this.apiClient.PUT('/tasks/{taskId}/status', {
+          params: { path: { taskId: task.id } },
+          body: { status },
+        });
+
+        if (error !== undefined) {
+          throw new ConsumerError(
+            `Failed to mark task ${task.id} as ${status}`,
+            JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
+            createAPIErrorFromResponse(response, error)
+          );
+        }
+
+        const duration = performance.now() - startTime;
+
+        this.logger.info(`Task marked as ${status}`, {
+          duration,
+          status: 'success',
+          metadata: {
+            taskId: task.id,
+          },
+        });
       }
     );
   }
 
-  /**
-   * Marks a task as completed using an existing task object.
-   * Avoids unnecessary API calls when the task is already available.
-   *
-   * @private
-   * @param task - Task object to mark as completed
-   * @param span - Current span for tracing
-   * @param startTime - Start time for duration calculation
-   * @returns Promise that resolves when the status update is complete
-   */
-  private async markTaskCompletedWithTask(task: components['schemas']['taskResponse'], span: Span, startTime: number): Promise<void> {
-    // Extract trace context and link to original create span
-    const remoteContext = propagation.extract(context.active(), task);
-    const taskSpanContext = trace.getSpanContext(remoteContext);
-
-    if (!taskSpanContext) {
-      throw new ConsumerError(`Failed to extract span context for task ${task.id}`, JOBNIK_SDK_ERROR_CODES.TRACE_CONTEXT_EXTRACT_ERROR);
-    }
-
-    // Validate task is in correct state for completion
-    if (task.status !== 'IN_PROGRESS') {
-      throw new ConsumerError(
-        `Cannot mark task ${task.id} as completed: task is in ${task.status} state, expected IN_PROGRESS`,
-        JOBNIK_SDK_ERROR_CODES.TASK_INVALID_STATE_TRANSITION
-      );
-    }
-
-    span.addLink({
-      context: taskSpanContext,
+  private async fetchTaskForUpdate(taskId: TaskId): Promise<Task> {
+    // Fetch task for validation and trace context
+    const taskResponse = await this.apiClient.GET('/tasks/{taskId}', {
+      params: { path: { taskId } },
     });
 
-    const { error, response } = await this.apiClient.PUT('/tasks/{taskId}/status', {
-      params: { path: { taskId: task.id } },
-      body: { status: 'COMPLETED' },
-    });
-
-    if (error !== undefined) {
+    if (taskResponse.error !== undefined) {
       throw new ConsumerError(
-        `Failed to mark task ${task.id} as completed`,
+        `Failed to retrieve task ${taskId} for status update`,
         JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-        createAPIErrorFromResponse(response, error)
+        createAPIErrorFromResponse(taskResponse.response, taskResponse.error)
       );
     }
 
-    const duration = performance.now() - startTime;
-
-    this.logger.info('Task marked as completed', {
-      operation: 'markTaskCompleted',
-      duration,
-      status: 'success',
-      metadata: {
-        taskId: task.id,
-      },
-    });
-  }
-
-  /**
-   * Marks a task as failed using an existing task object.
-   * Avoids unnecessary API calls when the task is already available.
-   *
-   * @private
-   * @param task - Task object to mark as failed
-   * @param span - Current span for tracing
-   * @param startTime - Start time for duration calculation
-   * @returns Promise that resolves when the status update is complete
-   */
-  private async markTaskFailedWithTask(task: components['schemas']['taskResponse'], span: Span, startTime: number): Promise<void> {
-    // Extract trace context and link to original create span
-    const remoteContext = propagation.extract(context.active(), task);
-    const taskSpanContext = trace.getSpanContext(remoteContext);
-
-    if (!taskSpanContext) {
-      throw new ConsumerError(`Failed to extract span context for task ${task.id}`, JOBNIK_SDK_ERROR_CODES.TRACE_CONTEXT_EXTRACT_ERROR);
-    }
-
-    // Validate task is in correct state for failure
-    if (task.status !== 'IN_PROGRESS') {
-      throw new ConsumerError(
-        `Cannot mark task ${task.id} as failed: task is in ${task.status} state, expected IN_PROGRESS`,
-        JOBNIK_SDK_ERROR_CODES.TASK_INVALID_STATE_TRANSITION
-      );
-    }
-
-    span.addLink({
-      context: taskSpanContext,
-    });
-
-    const { error, response } = await this.apiClient.PUT('/tasks/{taskId}/status', {
-      params: { path: { taskId: task.id } },
-      body: { status: 'FAILED' },
-    });
-
-    if (error !== undefined) {
-      throw new ConsumerError(
-        `Failed to mark task ${task.id} as failed`,
-        JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-        createAPIErrorFromResponse(response, error)
-      );
-    }
-
-    const duration = performance.now() - startTime;
-
-    this.logger.info('Task marked as failed', {
-      operation: 'markTaskFailed',
-      duration,
-      status: 'success',
-      metadata: {
-        taskId: task.id,
-      },
-    });
+    return taskResponse.data;
   }
 }

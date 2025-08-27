@@ -18,7 +18,7 @@ export type InferTaskData<StageType, StageTypes extends { [K in keyof StageTypes
 
 export type Task<TaskInfo extends TaskData = TaskData> = Prettify<
   Omit<components['schemas']['taskResponse'], TaskGenericProperties> & {
-    userMetadata: TaskInfo['userMetadata'];
+    userMetadata?: TaskInfo['userMetadata'];
     data: TaskInfo['data'];
   }
 >;
