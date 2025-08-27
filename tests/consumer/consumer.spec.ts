@@ -1,13 +1,13 @@
 import { describe, it, expect, afterEach, vi, beforeAll, afterAll } from 'vitest';
 import { propagation, trace } from '@opentelemetry/api';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
-import { MockAgent, MockPool } from 'undici';
+import { MockAgent, type MockPool } from 'undici';
 import { createApiClient } from '../../src/api/index';
 import { Consumer } from '../../src/clients/consumer';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
-import { StageId, TaskId } from '../../src/types/brands';
+import type { StageId, TaskId } from '../../src/types/brands';
 import { ConsumerError, API_ERROR_CODES } from '../../src/errors';
-import { Task } from '../../src/types/task';
+import type { Task } from '../../src/types/task';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 

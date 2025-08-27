@@ -1,4 +1,4 @@
-import { SpanKind, context, propagation, trace, type Span } from '@opentelemetry/api';
+import { SpanKind, context, propagation, trace } from '@opentelemetry/api';
 import { StatusCodes } from 'http-status-codes';
 import type { ApiClient } from '../api';
 import type { TaskId } from '../types/brands';
@@ -7,7 +7,7 @@ import type { ValidStageType, StageData } from '../types/stage';
 import type { components } from '../types/openapi';
 import { withSpan } from '../telemetry/trace';
 import { JOB_MANAGER_TASK_ATTEMPTS, JOB_MANAGER_TASK_STATUS, ATTR_MESSAGING_DESTINATION_NAME, ATTR_MESSAGING_MESSAGE_ID } from '../telemetry/semconv';
-import { Logger } from '../types';
+import type { Logger } from '../types';
 import { createAPIErrorFromResponse } from '../errors/utils';
 import { JOBNIK_SDK_ERROR_CODES, ConsumerError } from '../errors';
 
