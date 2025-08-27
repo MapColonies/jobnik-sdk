@@ -49,8 +49,10 @@ const DEFAULT_PRIORITY: Extract<components['schemas']['priority'], 'MEDIUM'> = '
  * const producer = new Producer<MyJobTypes, MyStageTypes>(apiClient, logger);
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export class Producer<JobTypes extends { [K in keyof JobTypes]: JobData } = {}, StageTypes extends { [K in keyof StageTypes]: StageData } = {}> {
+export class Producer<
+  JobTypes extends { [K in keyof JobTypes]: JobData } = Record<string, JobData>,
+  StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
+> {
   /**
    * Creates a new Producer instance.
    *

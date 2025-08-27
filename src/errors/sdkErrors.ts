@@ -43,6 +43,9 @@ export const JOBNIK_SDK_ERROR_CODES = {
   // Job Processing Errors (General)
   JOB_PROCESSING_FAILED: 'JOB_PROCESSING_FAILED',
 
+  // Task State Validation Errors
+  TASK_INVALID_STATE_TRANSITION: 'TASK_INVALID_STATE_TRANSITION',
+
   // Generic/Unknown SDK Error
   SDK_UNKNOWN_ERROR: 'SDK_UNKNOWN_ERROR',
 } as const;
@@ -167,6 +170,13 @@ export class APIError extends JobnikSDKError {
 }
 
 export class ProducerError extends JobnikSDKError {
+  public constructor(message: string, errorCode: APIErrorCode, cause?: unknown) {
+    super(message, errorCode, cause);
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export class ConsumerError extends JobnikSDKError {
   public constructor(message: string, errorCode: APIErrorCode, cause?: unknown) {
     super(message, errorCode, cause);
     Object.setPrototypeOf(this, new.target.prototype);
