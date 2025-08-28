@@ -3,9 +3,9 @@ import circuitBreaker, { Options as OpossumOptions } from 'opossum';
 import { context, propagation, Span, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
 import { ApiClient, ScopedApiClient } from '../api';
 import { Logger } from '../types';
-import { StageData } from '../types/stage';
+import { StageData, ValidStageType } from '../types/stage';
 import { getErrorMessageFromUnknown, presult } from '../common/utils';
-import { Task } from '../types/task';
+import { InferTaskData, Task, TaskData } from '../types/task';
 import {
   ATTR_JOB_MANAGER_STAGE_ID,
   ATTR_MESSAGING_BATCH_MESSAGE_COUNT,
@@ -43,10 +43,12 @@ export interface TaskHandlerContext {
   apiClient: ScopedApiClient; // Scoped for safety
 }
 
-export type TaskHandler = (task: Task, context: TaskHandlerContext) => Promise<void>;
+export type TaskHandler<TaskPayload extends TaskData> = (task: Task<TaskPayload>, context: TaskHandlerContext) => Promise<void>;
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>> extends BaseWorker<StageTypes> {
+export class Worker<
+  StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
+  StageType extends ValidStageType<StageTypes> = string,
+> extends BaseWorker<StageTypes> {
   private readonly abortController = new AbortController();
   private readonly taskHandlerCircuitBreaker: circuitBreaker<[Task, TaskHandlerContext]>;
   private taskCircuitBreakerPromise: Promise<void> | null = null;
@@ -60,8 +62,8 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
   private consecutiveEmptyPolls: number = 0;
 
   public constructor(
-    private readonly taskHandler: TaskHandler,
-    private readonly stageType: string,
+    private readonly taskHandler: TaskHandler<InferTaskData<StageType, StageTypes>>,
+    private readonly stageType: StageType,
     private readonly options: WorkerOptions,
     logger: Logger,
     apiClient: ApiClient
@@ -165,7 +167,7 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
 
           await this.taskHandlerCircuitBreaker.fire(task, taskContext);
           this.logger.debug('Task handler succeeded', { taskId: task.id, stageType: this.stageType });
-          await this.markTask('COMPLETED', { task: task, taskId: undefined });
+          await this.markTask('COMPLETED', { task, taskId: undefined });
 
           this.emit('taskCompleted', { taskId: task.id, stageType: this.stageType, duration: 0 });
 
@@ -178,13 +180,19 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
             error: getErrorMessageFromUnknown(error),
           });
 
-          const [err] = await presult(this.markTask('FAILED', { task: task, taskId: undefined }));
+          const [err] = await presult(this.markTask('FAILED', { task, taskId: undefined }));
 
           if (err) {
             this.logger.error('Error occurred while marking task as failed', {
               taskId: task.id,
               stageType: this.stageType,
               error: getErrorMessageFromUnknown(err),
+            });
+
+            this.emit('error', {
+              location: 'markTaskFailed',
+              error: err,
+              stageType: this.stageType,
             });
           }
 
@@ -207,6 +215,12 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
           taskId: task.id,
           stageType: this.stageType,
           error: getErrorMessageFromUnknown(error),
+        });
+
+        this.emit('error', {
+          location: 'taskProcessing',
+          error: error,
+          stageType: this.stageType,
         });
       })
       .finally(() => {
@@ -248,6 +262,12 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
         this.logger.debug('Error while dequeuing task', {
           stageType: this.stageType,
           error: getErrorMessageFromUnknown(err),
+        });
+
+        this.emit('error', {
+          location: 'taskDequeue',
+          error: err,
+          stageType: this.stageType,
         });
 
         span.recordException(err);

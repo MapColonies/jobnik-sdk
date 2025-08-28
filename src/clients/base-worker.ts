@@ -12,6 +12,7 @@ export interface WorkerEvents {
   taskStarted: { taskId: TaskId; stageType: string };
   taskCompleted: { taskId: TaskId; stageType: string; duration: number };
   taskFailed: { taskId: TaskId; stageType: string; error: unknown };
+  error: { location: string; error: unknown; stageType: string };
   circuitBreakerOpened: { breaker: 'taskHandler' | 'dequeueTask'; stageType: string };
   circuitBreakerClosed: { breaker: 'taskHandler' | 'dequeueTask'; stageType: string };
   queueEmpty: { stageType: string; consecutiveEmptyPolls: number };
