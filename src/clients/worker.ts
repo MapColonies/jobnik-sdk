@@ -15,6 +15,7 @@ import {
 import { BASE_ATTRIBUTES, tracer } from '../telemetry/trace';
 import { Producer } from './producer';
 import { Consumer } from './consumer';
+import { BaseWorker } from './base-worker';
 
 const DEFAULT_PULLING_INTERVAL = 10000;
 
@@ -46,7 +47,7 @@ export interface TaskHandlerContext {
 export type TaskHandler = (task: Task, context: TaskHandlerContext) => Promise<void>;
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = {}> extends Consumer<StageTypes> {
+export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>> extends BaseWorker<StageTypes> {
   private readonly abortController = new AbortController();
   private readonly taskHandlerCircuitBreaker: circuitBreaker<[Task, TaskHandlerContext]>;
   private taskCircuitBreakerPromise: Promise<void> | null = null;
@@ -57,6 +58,7 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
   // queue members
   private isRunning: boolean = false;
   private readonly runningTasks: Set<Promise<void>> = new Set();
+  private consecutiveEmptyPolls: number = 0;
 
   public constructor(
     private readonly taskHandler: TaskHandler,
@@ -93,6 +95,11 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
 
     this.isRunning = true;
 
+    this.emit('started', {
+      stageType: this.stageType,
+      concurrency: this.options.concurrency ?? 1,
+    });
+
     for await (const [task, span] of this.taskIterator()) {
       this.logger.debug('Dequeued task for processing', {
         taskId: task.id,
@@ -114,21 +121,33 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
     }
   }
 
-  public async stop(): Promise<void> {
+  public override async stop(): Promise<void> {
+    this.emit('stopping', {
+      stageType: this.stageType,
+      runningTasks: this.runningTasks.size,
+    });
+
     this.logger.info('Stopping worker', {
       stageType: this.stageType,
       runningTasks: this.runningTasks.size,
     });
 
     this.isRunning = false;
+    await super.stop();
     this.abortController.abort('shutdown called');
 
     await Promise.allSettled(this.runningTasks);
+
     this.logger.info('Worker stopped', { stageType: this.stageType });
+
+    this.emit('stopped', { stageType: this.stageType });
   }
 
   private runTask(task: Task, span: Span): void {
     this.logger.info('Running task', { taskId: task.id, stageType: this.stageType });
+
+    this.emit('taskStarted', { taskId: task.id, stageType: this.stageType });
+
     const taskContext = {
       signal: this.abortController.signal,
       logger: this.logger,
@@ -148,6 +167,9 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
           await this.taskHandlerCircuitBreaker.fire(task, taskContext);
           this.logger.debug('Task handler succeeded', { taskId: task.id, stageType: this.stageType });
           await this.markTask('COMPLETED', { task: task, taskId: undefined });
+
+          this.emit('taskCompleted', { taskId: task.id, stageType: this.stageType, duration: 0 });
+
           span.setStatus({ code: SpanStatusCode.OK });
           span.end();
         } catch (error) {
@@ -166,6 +188,12 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
               error: getErrorMessageFromUnknown(err),
             });
           }
+
+          this.emit('taskFailed', {
+            taskId: task.id,
+            stageType: this.stageType,
+            error: error,
+          });
 
           span.recordException(error as Error);
           span.setStatus({ code: SpanStatusCode.ERROR });
@@ -230,6 +258,8 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
       }
 
       if (task) {
+        this.consecutiveEmptyPolls = 0;
+
         this.logger.debug('Yielding task from iterator', {
           taskId: task.id,
           stageType: this.stageType,
@@ -249,6 +279,13 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
 
         yield [task, span];
       } else {
+        this.consecutiveEmptyPolls++;
+
+        this.emit('queueEmpty', {
+          stageType: this.stageType,
+          consecutiveEmptyPolls: this.consecutiveEmptyPolls,
+        });
+
         span.setAttribute(ATTR_MESSAGING_BATCH_MESSAGE_COUNT, 0);
         span.end();
       }
@@ -268,10 +305,20 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
   private setupDequeueCircuitBreaker(): void {
     this.dequeueTaskCircuitBreaker.on('open', () => {
       this.logger.warn('Dequeue task circuit breaker opened', { stageType: this.stageType });
+
+      this.emit('circuitBreakerOpened', {
+        breaker: 'dequeueTask',
+        stageType: this.stageType,
+      });
     });
 
     this.dequeueTaskCircuitBreaker.on('close', () => {
       this.logger.info('Dequeue task circuit breaker closed', { stageType: this.stageType });
+
+      this.emit('circuitBreakerClosed', {
+        breaker: 'dequeueTask',
+        stageType: this.stageType,
+      });
     });
 
     this.dequeueTaskCircuitBreaker.on('halfOpen', () => {
@@ -282,6 +329,12 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
   private setupTaskHandlerCircuitBreaker(): void {
     this.taskHandlerCircuitBreaker.on('open', () => {
       this.logger.warn('Task handler circuit breaker opened', { stageType: this.stageType });
+
+      this.emit('circuitBreakerOpened', {
+        breaker: 'taskHandler',
+        stageType: this.stageType,
+      });
+
       this.taskCircuitBreakerPromise = new Promise((resolve) => {
         this.taskCircuitBreakerResolve = resolve;
       });
@@ -289,6 +342,12 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
 
     this.taskHandlerCircuitBreaker.on('close', () => {
       this.logger.info('Task handler circuit breaker closed', { stageType: this.stageType });
+
+      this.emit('circuitBreakerClosed', {
+        breaker: 'taskHandler',
+        stageType: this.stageType,
+      });
+
       this.resolveTaskCircuitBreaker();
     });
 
