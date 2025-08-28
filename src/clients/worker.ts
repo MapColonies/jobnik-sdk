@@ -14,10 +14,9 @@ import {
 } from '../telemetry/semconv';
 import { BASE_ATTRIBUTES, tracer } from '../telemetry/trace';
 import { Producer } from './producer';
-import { Consumer } from './consumer';
 import { BaseWorker } from './base-worker';
 
-const DEFAULT_PULLING_INTERVAL = 10000;
+const DEFAULT_POLLING_INTERVAL = 10000;
 
 const defaultCircuitBreakerOptions = {
   enabled: true,
@@ -290,7 +289,7 @@ export class Worker<StageTypes extends { [K in keyof StageTypes]: StageData } = 
         span.end();
       }
 
-      await sleep(this.options.pullingInterval ?? DEFAULT_PULLING_INTERVAL);
+      await sleep(this.options.pullingInterval ?? DEFAULT_POLLING_INTERVAL);
     }
   }
 
