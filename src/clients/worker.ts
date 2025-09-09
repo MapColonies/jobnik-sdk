@@ -297,6 +297,7 @@ export class Worker<
         });
 
         yield [task, span];
+        continue;
       } else {
         this.consecutiveEmptyPolls++;
 
