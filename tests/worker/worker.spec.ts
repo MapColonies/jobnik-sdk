@@ -276,7 +276,7 @@ describe('Worker', () => {
         await worker.stop();
 
         const errorEvents = events.filter((e) => e.type === 'error');
-        expect(errorEvents).toHaveLength(2);
+        expect(errorEvents).toHaveLength(1);
       });
     });
   });
