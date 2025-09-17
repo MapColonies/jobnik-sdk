@@ -1,8 +1,9 @@
 import { describe, it, expectTypeOf } from 'vitest';
-import { Worker, TaskHandler, WorkerOptions } from '../../src/clients/worker';
+import { Worker } from '../../src/clients/worker';
 import type { ApiClient } from '../../src/api';
 import type { TaskId } from '../../src/types/brands';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
+import type { TaskHandler, WorkerOptions } from '../../src/types/worker';
 
 // Test stage types for type checking
 interface TestStageTypes {

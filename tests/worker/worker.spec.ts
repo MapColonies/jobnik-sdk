@@ -5,11 +5,12 @@ import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { MockAgent, type MockPool } from 'undici';
 import createClient from 'openapi-fetch';
 import { createApiClient } from '../../src/api/index';
-import { Worker, type TaskHandler, type WorkerOptions } from '../../src/clients/worker';
+import { Worker } from '../../src/clients/worker';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
 import type { StageId, TaskId } from '../../src/types/brands';
 import type { Task, TaskData } from '../../src/types/task';
 import type { Logger } from '../../src/types';
+import type { TaskHandler, WorkerOptions } from '../../src/types/worker';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
