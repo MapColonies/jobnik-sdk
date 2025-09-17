@@ -222,16 +222,18 @@ export class Worker<
    * ```
    */
   public async start(): Promise<void> {
+    const concurrency = this.options.concurrency ?? 1;
+
     this.logger.info('Starting worker', {
       stageType: this.stageType,
-      concurrency: this.options.concurrency ?? 1,
+      concurrency,
     });
 
     this.isRunning = true;
 
     this.emit('started', {
       stageType: this.stageType,
-      concurrency: this.options.concurrency ?? 1,
+      concurrency,
     });
 
     for await (const [task, span] of this.taskIterator()) {
@@ -243,10 +245,10 @@ export class Worker<
 
       this.runTask(task, span);
 
-      while (this.runningTasks.size >= (this.options.concurrency ?? 1)) {
+      while (this.runningTasks.size >= concurrency) {
         this.logger.debug('Concurrency limit reached', {
           runningTasks: this.runningTasks.size,
-          concurrency: this.options.concurrency ?? 1,
+          concurrency,
           stageType: this.stageType,
           waiting: true,
         });
