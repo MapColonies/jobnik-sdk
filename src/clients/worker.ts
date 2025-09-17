@@ -1,9 +1,9 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import circuitBreaker, { type Options as OpossumOptions } from 'opossum';
 import { context, propagation, type Span, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
-import { ApiClient } from '../api';
+import type { ApiClient } from '../api';
 import type { Logger } from '../types';
-import { StageData, ValidStageType } from '../types/stage';
+import type { StageData, ValidStageType } from '../types/stage';
 import { getErrorMessageFromUnknown, presult } from '../common/utils';
 import type { InferTaskData, Task } from '../types/task';
 import {
@@ -17,8 +17,10 @@ import type { TaskHandler, TaskHandlerContext, WorkerOptions } from '../types/wo
 import { Producer } from './producer';
 import { BaseWorker } from './base-worker';
 
+/** Default polling interval in milliseconds for task dequeue operations */
 const DEFAULT_POLLING_INTERVAL = 10000;
 
+/** Default circuit breaker configuration with resilient defaults */
 const defaultCircuitBreakerOptions = {
   enabled: true,
   rollingCountTimeout: 60000,
@@ -28,22 +30,138 @@ const defaultCircuitBreakerOptions = {
   allowWarmUp: true,
 } satisfies OpossumOptions;
 
+/**
+ * Production-ready worker for processing tasks from the job management system.
+ *
+ * Provides concurrent task processing with circuit breaker protection, observability,
+ * and graceful shutdown capabilities. Supports configurable concurrency, polling intervals,
+ * and failure resilience patterns.
+ *
+ * Key features:
+ * - **Concurrent Processing**: Configurable task concurrency with backpressure handling
+ * - **Circuit Breaker Protection**: Separate circuit breakers for task handling and dequeue operations
+ * - **Observability**: Comprehensive event emission and distributed tracing support
+ * - **Graceful Shutdown**: Coordinated shutdown with running task completion
+ * - **Type Safety**: Full TypeScript support with stage-specific task type inference
+ *
+ * @template StageTypes - Stage type definitions mapping stage names to their data structures
+ * @template StageType - Specific stage type this worker processes (must be key of StageTypes)
+ *
+ * @example
+ * ```typescript
+ * // Define your stage types
+ * interface MyStageTypes {
+ *   'image-resize': {
+ *     userMetadata: { quality: number };
+ *     data: { width: number; height: number };
+ *     task: {
+ *       userMetadata: { batchId: string };
+ *       data: { sourceUrl: string; targetPath: string };
+ *     };
+ *   };
+ * }
+ *
+ * // Create task handler
+ * const taskHandler: TaskHandler<MyStageTypes['image-resize']['task']> = async (task, context) => {
+ *   const { sourceUrl, targetPath } = task.data;
+ *   const { batchId } = task.userMetadata;
+ *
+ *   context.logger.info('Processing image resize', { taskId: task.id, batchId });
+ *
+ *   // Check for cancellation
+ *   if (context.signal.aborted) {
+ *     throw new Error('Task cancelled during shutdown');
+ *   }
+ *
+ *   // Process image
+ *   await resizeImage(sourceUrl, targetPath, task.data.width, task.data.height);
+ *
+ *   // Create follow-up task
+ *   await context.producer.createTask('image-upload', {
+ *     data: { processedPath: targetPath, batchId }
+ *   });
+ * };
+ *
+ * // Configure worker
+ * const worker = new Worker<MyStageTypes, 'image-resize'>(
+ *   taskHandler,
+ *   'image-resize',
+ *   {
+ *     concurrency: 5,
+ *     pullingInterval: 5000,
+ *     taskHandlerCircuitBreaker: {
+ *       errorThresholdPercentage: 30,
+ *       resetTimeout: 60000
+ *     }
+ *   },
+ *   logger,
+ *   apiClient
+ * );
+ *
+ * // Set up monitoring
+ * worker.on('taskCompleted', ({ taskId, duration }) => {
+ *   console.log(`Task ${taskId} completed in ${duration}ms`);
+ * });
+ *
+ * worker.on('error', ({ location, error }) => {
+ *   console.error(`Worker error in ${location}:`, error);
+ * });
+ *
+ * // Start processing
+ * await worker.start();
+ * ```
+ */
 export class Worker<
   StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
   StageType extends ValidStageType<StageTypes> = string,
 > extends BaseWorker<StageTypes> {
+  /** Abort controller for coordinated shutdown and task cancellation */
   private readonly abortController = new AbortController();
+  /** Circuit breaker protecting task handler execution from failures */
   private readonly taskHandlerCircuitBreaker: circuitBreaker<[Task, TaskHandlerContext]>;
+  /** Promise for waiting on task circuit breaker state changes */
   private taskCircuitBreakerPromise: Promise<void> | null = null;
+  /** Resolver function for task circuit breaker promise */
   private taskCircuitBreakerResolve: ((value: void) => void) | null = null;
+  /** Circuit breaker protecting task dequeue operations from failures */
   private readonly dequeueTaskCircuitBreaker: circuitBreaker<[string], Task | null>;
+  /** Timeout duration for task handler circuit breaker reset attempts */
   private readonly taskHandlerCbResetTimeout: number;
 
   // queue members
+  /** Flag indicating if worker is actively processing tasks */
   private isRunning: boolean = false;
+  /** Set of currently executing task promises for concurrency management */
   private readonly runningTasks: Set<Promise<void>> = new Set();
+  /** Counter for consecutive empty polling attempts (for backoff strategies) */
   private consecutiveEmptyPolls: number = 0;
 
+  /**
+   * Creates a new Worker instance with the specified configuration.
+   *
+   * Sets up circuit breakers, configures polling behavior, and prepares
+   * the worker for task processing with the provided handler function.
+   *
+   * @param taskHandler - Function to process dequeued tasks
+   * @param stageType - Stage type to process tasks for
+   * @param options - Worker configuration options
+   * @param logger - Logger instance for operation tracking
+   * @param apiClient - HTTP client for API communication
+   *
+   * @example
+   * ```typescript
+   * const worker = new Worker(
+   *   async (task, context) => {
+   *     // Process task
+   *     await processImageResize(task.data);
+   *   },
+   *   'image-resize',
+   *   { concurrency: 3, pullingInterval: 5000 },
+   *   logger,
+   *   apiClient
+   * );
+   * ```
+   */
   public constructor(
     private readonly taskHandler: TaskHandler<InferTaskData<StageType, StageTypes>>,
     private readonly stageType: StageType,
@@ -71,6 +189,38 @@ export class Worker<
     this.setupDequeueCircuitBreaker();
   }
 
+  /**
+   * Starts the worker and begins processing tasks from the specified stage.
+   *
+   * Initiates the task polling loop with configured concurrency limits.
+   * The worker will continuously poll for tasks, process them concurrently,
+   * and emit events for monitoring and observability.
+   *
+   * The method implements backpressure by limiting concurrent tasks and waiting
+   * for completion when the concurrency limit is reached.
+   *
+   * @returns Promise that resolves when the worker stops (via stop() call)
+   *
+   * @fires WorkerEvents#started - When worker begins processing
+   * @fires WorkerEvents#taskStarted - When each task begins processing
+   * @fires WorkerEvents#taskCompleted - When tasks complete successfully
+   * @fires WorkerEvents#taskFailed - When tasks fail during processing
+   * @fires WorkerEvents#queueEmpty - When no tasks are available
+   * @fires WorkerEvents#error - When errors occur during operation
+   *
+   * @example
+   * ```typescript
+   * const worker = new Worker(taskHandler, 'image-resize', options, logger, apiClient);
+   *
+   * // Set up monitoring
+   * worker.on('started', ({ stageType, concurrency }) => {
+   *   console.log(`Worker started for ${stageType} with concurrency ${concurrency}`);
+   * });
+   *
+   * // Start processing (this promise resolves when worker stops)
+   * await worker.start();
+   * ```
+   */
   public async start(): Promise<void> {
     this.logger.info('Starting worker', {
       stageType: this.stageType,
@@ -105,6 +255,29 @@ export class Worker<
     }
   }
 
+  /**
+   * Gracefully stops the worker and waits for running tasks to complete.
+   *
+   * Initiates shutdown by setting the running flag to false, aborting the
+   * cancellation signal, and waiting for all currently running tasks to finish.
+   * Provides clean shutdown coordination for production deployments.
+   *
+   * @returns Promise that resolves when all tasks complete and worker fully stops
+   *
+   * @fires WorkerEvents#stopping - When shutdown begins
+   * @fires WorkerEvents#stopped - When worker fully stops
+   *
+   * @example
+   * ```typescript
+   * // Graceful shutdown on SIGTERM
+   * process.on('SIGTERM', async () => {
+   *   console.log('Shutting down worker...');
+   *   await worker.stop();
+   *   console.log('Worker stopped');
+   *   process.exit(0);
+   * });
+   * ```
+   */
   public override async stop(): Promise<void> {
     this.emit('stopping', {
       stageType: this.stageType,
@@ -127,6 +300,20 @@ export class Worker<
     this.emit('stopped', { stageType: this.stageType });
   }
 
+  /**
+   * Executes a single task with proper error handling and observability.
+   *
+   * Wraps task execution with distributed tracing, error handling, and status updates.
+   * Handles task completion/failure status updates and emits appropriate events.
+   *
+   * This method is called internally by the task processing loop and should not
+   * be called directly by user code.
+   *
+   * @param task - Task to execute
+   * @param span - OpenTelemetry span for distributed tracing
+   *
+   * @internal
+   */
   private runTask(task: Task, span: Span): void {
     this.logger.info('Running task', { taskId: task.id, stageType: this.stageType });
 
@@ -148,11 +335,13 @@ export class Worker<
             stageType: this.stageType,
           });
 
+          const startTime = performance.now();
+
           await this.taskHandlerCircuitBreaker.fire(task, taskContext);
           this.logger.debug('Task handler succeeded', { taskId: task.id, stageType: this.stageType });
           await this.markTask('COMPLETED', { task, taskId: undefined });
 
-          this.emit('taskCompleted', { taskId: task.id, stageType: this.stageType, duration: 0 });
+          this.emit('taskCompleted', { taskId: task.id, stageType: this.stageType, duration: performance.now() - startTime });
 
           span.setStatus({ code: SpanStatusCode.OK });
           span.end();
@@ -218,6 +407,23 @@ export class Worker<
     this.runningTasks.add(taskPromise);
   }
 
+  /**
+   * Async generator that yields tasks from the job management system.
+   *
+   * Implements the core polling loop with circuit breaker protection,
+   * distributed tracing, and empty queue handling. Continues until
+   * the worker is stopped via the stop() method.
+   *
+   * The iterator handles:
+   * - Circuit breaker coordination for resilient polling
+   * - Distributed trace context extraction and linking
+   * - Empty queue detection and backoff timing
+   * - Error handling with proper span recording
+   *
+   * @yields Tuple of [Task, Span] for each available task
+   *
+   * @internal
+   */
   private async *taskIterator(): AsyncGenerator<[Task, Span]> {
     while (this.isRunning) {
       if (this.taskCircuitBreakerPromise) {
@@ -297,6 +503,14 @@ export class Worker<
     }
   }
 
+  /**
+   * Resolves the task circuit breaker promise to unblock task processing.
+   *
+   * Called when the task handler circuit breaker transitions from open
+   * to half-open or closed state, allowing task processing to resume.
+   *
+   * @internal
+   */
   private resolveTaskCircuitBreaker(): void {
     if (this.taskCircuitBreakerResolve) {
       this.taskCircuitBreakerResolve();
@@ -305,6 +519,15 @@ export class Worker<
     }
   }
 
+  /**
+   * Sets up event handlers for the dequeue task circuit breaker.
+   *
+   * Configures logging and event emission for circuit breaker state changes
+   * during task dequeue operations. Provides visibility into dequeue failures
+   * and recovery patterns.
+   *
+   * @internal
+   */
   private setupDequeueCircuitBreaker(): void {
     this.dequeueTaskCircuitBreaker.on('open', () => {
       this.logger.warn('Dequeue task circuit breaker opened', { stageType: this.stageType });
@@ -329,6 +552,15 @@ export class Worker<
     });
   }
 
+  /**
+   * Sets up event handlers for the task handler circuit breaker.
+   *
+   * Configures logging, event emission, and promise coordination for circuit breaker
+   * state changes during task handler execution. Manages the task circuit breaker
+   * promise that blocks task processing when the circuit breaker is open.
+   *
+   * @internal
+   */
   private setupTaskHandlerCircuitBreaker(): void {
     this.taskHandlerCircuitBreaker.on('open', () => {
       this.logger.warn('Task handler circuit breaker opened', { stageType: this.stageType });
