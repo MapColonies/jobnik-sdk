@@ -1,11 +1,11 @@
 import { setTimeout as sleep } from 'node:timers/promises';
-import circuitBreaker, { Options as OpossumOptions } from 'opossum';
-import { context, propagation, Span, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
-import { ApiClient, ScopedApiClient } from '../api';
-import { Logger } from '../types';
+import circuitBreaker, { type Options as OpossumOptions } from 'opossum';
+import { context, propagation, type Span, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
+import { ApiClient } from '../api';
+import type { Logger } from '../types';
 import { StageData, ValidStageType } from '../types/stage';
 import { getErrorMessageFromUnknown, presult } from '../common/utils';
-import { InferTaskData, Task, TaskData } from '../types/task';
+import type { InferTaskData, Task } from '../types/task';
 import {
   ATTR_JOB_MANAGER_STAGE_ID,
   ATTR_MESSAGING_BATCH_MESSAGE_COUNT,
@@ -13,6 +13,7 @@ import {
   ATTR_MESSAGING_MESSAGE_ID,
 } from '../telemetry/semconv';
 import { BASE_ATTRIBUTES, tracer } from '../telemetry/trace';
+import type { TaskHandler, TaskHandlerContext, WorkerOptions } from '../types/worker';
 import { Producer } from './producer';
 import { BaseWorker } from './base-worker';
 
@@ -26,24 +27,6 @@ const defaultCircuitBreakerOptions = {
   timeout: false,
   allowWarmUp: true,
 } satisfies OpossumOptions;
-
-export type CircuitBreakerOptions = Pick<OpossumOptions, 'enabled' | 'rollingCountTimeout' | 'errorThresholdPercentage' | 'resetTimeout'>;
-
-export interface WorkerOptions {
-  concurrency?: number;
-  pullingInterval?: number;
-  taskHandlerCircuitBreaker?: CircuitBreakerOptions;
-  dequeueTaskCircuitBreaker?: CircuitBreakerOptions;
-}
-
-export interface TaskHandlerContext {
-  signal: AbortSignal;
-  logger: Logger;
-  producer: Producer;
-  apiClient: ScopedApiClient; // Scoped for safety
-}
-
-export type TaskHandler<TaskPayload extends TaskData> = (task: Task<TaskPayload>, context: TaskHandlerContext) => Promise<void>;
 
 export class Worker<
   StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,

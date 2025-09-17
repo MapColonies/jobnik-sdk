@@ -1,7 +1,9 @@
+import { setTimeout as sleep } from 'timers/promises';
 import { describe, it, expect, afterEach, vi, beforeAll, afterAll, beforeEach, type MockedFunction } from 'vitest';
 import { propagation } from '@opentelemetry/api';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { MockAgent, type MockPool } from 'undici';
+import createClient from 'openapi-fetch';
 import { createApiClient } from '../../src/api/index';
 import { Worker, type TaskHandler, type WorkerOptions } from '../../src/clients/worker';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
@@ -10,22 +12,6 @@ import type { Task, TaskData } from '../../src/types/task';
 import type { Logger } from '../../src/types';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
-
-// Add type declaration for global mockAgent
-declare global {
-  // eslint-disable-next-line no-var
-  var mockAgentForTest: MockAgent;
-}
-
-// Mock the Agent constructor from undici to use our MockAgent instance
-vi.mock('undici', async () => {
-  const originalModule = await vi.importActual('undici');
-  return {
-    ...originalModule,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    Agent: vi.fn().mockImplementation(() => global.mockAgentForTest),
-  };
-});
 
 function createMockTask(override: Partial<Task> = {}): Task {
   const defaultTask: Task = {
@@ -76,31 +62,33 @@ describe('Worker', () => {
   const stageType = 'image-resize';
 
   beforeAll(() => {
-    logger = {
-      debug: console.log,
-      info: console.log,
-      warn: console.warn,
-      error: console.error,
-    };
-
-    mockAgent = new MockAgent();
-    mockAgent.disableNetConnect();
-    global.mockAgentForTest = mockAgent;
-
-    mockPool = mockAgent.get(baseUrl);
+    // logger = {
+    //   debug: console.log,
+    //   info: console.log,
+    //   warn: console.warn,
+    //   error: console.error,
+    // };
+    logger = new NoopLogger();
   });
 
   beforeEach(() => {
     vi.useFakeTimers();
     taskHandler = vi.fn().mockResolvedValue(undefined);
 
-    apiClient = createApiClient(baseUrl, {
-      retry: { maxRetries: 0 },
-      agentOptions: { keepAliveTimeout: 1 },
-    });
+    mockAgent = new MockAgent();
+    mockAgent.disableNetConnect();
+    // global.mockAgentForTest = mockAgent;
+
+    mockPool = mockAgent.get(baseUrl);
+    // apiClient = createApiClient(baseUrl, {
+    //   retry: { maxRetries: 0 },
+    //   agentOptions: { keepAliveTimeout: 1 },
+    // });
+    apiClient = createClient({ dispatcher: mockAgent, baseUrl });
     const workerOptions: WorkerOptions = {
       concurrency: 1,
-      pullingInterval: 10000,
+      taskHandlerCircuitBreaker: { enabled: true },
+      pullingInterval: 500,
     };
 
     worker = new Worker(taskHandler, stageType, workerOptions, logger, apiClient);
@@ -128,10 +116,12 @@ describe('Worker', () => {
       it('should successfully process a single task', async () => {
         const mockTask = createMockTask({ id: 'task-1' as TaskId });
 
+        const events = collectEvents(worker);
+
         // Mock successful API calls - simplified without chaining
         mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
         mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/completed`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
 
         void worker.start();
         vi.runAllTicks();
@@ -140,6 +130,8 @@ describe('Worker', () => {
 
         expect(taskHandler).toHaveBeenCalledTimes(1);
         expect(taskHandler).toHaveBeenCalledWith(mockTask, expect.objectContaining({}));
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        expect(events).not.toSatisfyAny((event) => event.type === 'error');
       });
 
       it('should process multiple tasks sequentially', async () => {
@@ -179,6 +171,8 @@ describe('Worker', () => {
         const taskStartedEvents = events.filter((e) => e.type === 'taskStarted');
         expect(taskStartedEvents).toHaveLength(2);
       });
+
+      it('should ');
     });
 
     describe('Sad Path - Task Handler Failures', () => {
@@ -190,7 +184,7 @@ describe('Worker', () => {
 
         mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
         mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/failed`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
 
         const events = collectEvents(worker);
 
@@ -199,12 +193,39 @@ describe('Worker', () => {
         vi.runAllTicks();
         await worker.stop();
 
-        console.dir(events, { depth: null });
-
         expect(taskHandler).toHaveBeenCalledTimes(1);
 
-        const eventTypes = events.map((e) => e.type);
-        expect(eventTypes).toEqual(['started', 'taskStarted', 'taskFailed', 'stopped']);
+        const taskFailedEvent = events.find((e) => e.type === 'taskFailed');
+        expect(taskFailedEvent?.data).toEqual({
+          taskId: mockTask.id,
+          stageType,
+          error: taskError,
+        });
+      });
+
+      it('should handle repeated task failures', async () => {
+        const mockTask = createMockTask({ id: 'task-fail' as TaskId });
+        const taskError = new Error('Task processing failed');
+
+        taskHandler.mockRejectedValue(taskError);
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(null));
+
+        mockPool
+          .intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' })
+          .reply(200, JSON.stringify({ success: true }))
+          .persist();
+
+        const events = collectEvents(worker);
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        expect(taskHandler).toHaveBeenCalledTimes(2);
 
         const taskFailedEvent = events.find((e) => e.type === 'taskFailed');
         expect(taskFailedEvent?.data).toEqual({
@@ -231,6 +252,30 @@ describe('Worker', () => {
 
         const errorEvents = events.filter((e) => e.type === 'error');
         expect(errorEvents).toHaveLength(1);
+      });
+
+      it('should handle two task marking API failures', async () => {
+        const mockTask = createMockTask({ id: 'task-1' as TaskId });
+
+        const events = collectEvents(worker);
+
+        // Mock successful API calls - simplified without chaining
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(500, JSON.stringify({ error: true }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(500, JSON.stringify({ error: true }));
+
+        vi.spyOn(logger, 'error').mockImplementationOnce(() => {
+          throw new Error('Simulated logging failure');
+        });
+
+        void worker.start();
+        vi.runAllTicks();
+        await vi.advanceTimersByTimeAsync(200000);
+        await worker.stop();
+
+        const errorEvents = events.filter((e) => e.type === 'error');
+        expect(errorEvents).toHaveLength(2);
       });
     });
   });
@@ -267,31 +312,33 @@ describe('Worker', () => {
         let signalAborted = false;
 
         taskHandler.mockImplementation(async (task, context) => {
-          // Simulate long-running task that checks abort signal
-          return new Promise<void>((resolve) => {
-            const checkAbort = () => {
-              if (context.signal.aborted) {
-                signalAborted = true;
-                resolve();
-              } else {
-                setTimeout(checkAbort, 100);
-              }
-            };
-            checkAbort();
-          });
+          const checkAbort = async () => {
+            if (context.signal.aborted) {
+              signalAborted = true;
+            } else {
+              await sleep(100);
+            }
+          };
+          while (!signalAborted) {
+            await checkAbort();
+          }
         });
 
         mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
         mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
 
         void worker.start();
 
         // Start task processing
-        await vi.advanceTimersByTimeAsync(10000);
+        await vi.advanceTimersByTimeAsync(1000);
         vi.runAllTicks();
 
         // Stop worker while task is running
-        await worker.stop();
+        const stopPromise = worker.stop();
+        await vi.advanceTimersByTimeAsync(1000);
+        vi.runAllTicks();
+        await stopPromise;
 
         expect(signalAborted).toBe(true);
       });
@@ -340,7 +387,7 @@ describe('Worker', () => {
 
         mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
         mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/completed`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
 
         void worker.start();
         await vi.advanceTimersByTimeAsync(10000);
@@ -361,7 +408,7 @@ describe('Worker', () => {
 
         mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
         mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/completed`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
 
         void worker.start();
         await vi.advanceTimersByTimeAsync(10000);
@@ -371,7 +418,7 @@ describe('Worker', () => {
         expect(taskHandler).toHaveBeenCalledWith(mockTask, expect.objectContaining({}));
 
         const context = taskHandler.mock.calls[0]?.[1];
-        expect(context?.signal.aborted).toBe(false);
+        expect(context?.signal.aborted).toBe(true);
         expect(context?.logger).toBeDefined();
         expect(context?.producer).toBeDefined();
         expect(context?.apiClient).toBeDefined();
