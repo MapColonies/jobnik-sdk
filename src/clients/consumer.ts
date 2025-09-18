@@ -8,6 +8,7 @@ import type { components } from '../types/openapi';
 import { withSpan } from '../telemetry/trace';
 import { JOB_MANAGER_TASK_ATTEMPTS, JOB_MANAGER_TASK_STATUS, ATTR_MESSAGING_DESTINATION_NAME, ATTR_MESSAGING_MESSAGE_ID } from '../telemetry/semconv';
 import type { Logger } from '../types';
+import type { IConsumer } from '../types/consumer';
 import { createAPIErrorFromResponse } from '../errors/utils';
 import { JOBNIK_SDK_ERROR_CODES, ConsumerError } from '../errors';
 
@@ -34,7 +35,7 @@ import { JOBNIK_SDK_ERROR_CODES, ConsumerError } from '../errors';
  * ```
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } = {}> {
+export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } = {}> implements IConsumer<StageTypes> {
   /**
    * Creates a new Consumer instance.
    *

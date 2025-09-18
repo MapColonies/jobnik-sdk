@@ -12,9 +12,10 @@ import {
   ATTR_MESSAGING_DESTINATION_NAME,
   ATTR_MESSAGING_MESSAGE_ID,
 } from '../telemetry/semconv';
+import type { JobData } from '../types/job';
 import { BASE_ATTRIBUTES, tracer } from '../telemetry/trace';
-import type { TaskHandler, TaskHandlerContext, WorkerOptions } from '../types/worker';
-import { Producer } from './producer';
+import type { IWorker, TaskHandler, TaskHandlerContext, WorkerOptions } from '../types/worker';
+import type { IProducer } from '../types/producer';
 import { BaseWorker } from './base-worker';
 
 /** Default polling interval in milliseconds for task dequeue operations */
@@ -112,13 +113,17 @@ const defaultCircuitBreakerOptions = {
  * ```
  */
 export class Worker<
-  StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
-  StageType extends ValidStageType<StageTypes> = string,
-> extends BaseWorker<StageTypes> {
+    StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
+    StageType extends ValidStageType<StageTypes> = string,
+    JobTypes extends { [K in keyof JobTypes]: JobData } = Record<string, JobData>,
+  >
+  extends BaseWorker<StageTypes>
+  implements IWorker
+{
   /** Abort controller for coordinated shutdown and task cancellation */
   private readonly abortController = new AbortController();
   /** Circuit breaker protecting task handler execution from failures */
-  private readonly taskHandlerCircuitBreaker: circuitBreaker<[Task, TaskHandlerContext]>;
+  private readonly taskHandlerCircuitBreaker: circuitBreaker<[Task, TaskHandlerContext<JobTypes, StageTypes>]>;
   /** Promise for waiting on task circuit breaker state changes */
   private taskCircuitBreakerPromise: Promise<void> | null = null;
   /** Resolver function for task circuit breaker promise */
@@ -163,11 +168,12 @@ export class Worker<
    * ```
    */
   public constructor(
-    private readonly taskHandler: TaskHandler<InferTaskData<StageType, StageTypes>>,
+    private readonly taskHandler: TaskHandler<InferTaskData<StageType, StageTypes>, JobTypes, StageTypes>,
     private readonly stageType: StageType,
     private readonly options: WorkerOptions,
     logger: Logger,
-    apiClient: ApiClient
+    apiClient: ApiClient,
+    private readonly producer: IProducer<JobTypes, StageTypes>
   ) {
     super(apiClient, logger);
     this.taskHandlerCircuitBreaker = new circuitBreaker(this.taskHandler, {
@@ -324,7 +330,7 @@ export class Worker<
     const taskContext = {
       signal: this.abortController.signal,
       logger: this.logger,
-      producer: new Producer(this.apiClient, this.logger),
+      producer: this.producer,
       apiClient: this.apiClient,
     };
 

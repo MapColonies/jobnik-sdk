@@ -5,6 +5,7 @@ import type { JobId, StageId } from '../types/brands';
 import type { InferJobData, Job, JobData, NewJob, ValidJobName } from '../types/job';
 import type { InferStageData, NewStage, Stage, StageData, ValidStageType } from '../types/stage';
 import type { InferTaskData, NewTask, Task } from '../types/task';
+import type { IProducer } from '../types/producer';
 import { tracer, withSpan } from '../telemetry/trace';
 import {
   ATTR_JOB_MANAGER_JOB_NAME,
@@ -52,7 +53,8 @@ const DEFAULT_PRIORITY: Extract<components['schemas']['priority'], 'MEDIUM'> = '
 export class Producer<
   JobTypes extends { [K in keyof JobTypes]: JobData } = Record<string, JobData>,
   StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
-> {
+> implements IProducer<JobTypes, StageTypes>
+{
   /**
    * Creates a new Producer instance.
    *
