@@ -1,14 +1,15 @@
+import type customMatchers from 'jest-extended';
+
 import { APIErrorCode } from '../../src/errors';
 
-interface CustomMatchers<R = unknown> {
+interface MyCustomMatchers<R = unknown> {
   toHaveCauseCode: (expectedCode: APIErrorCode) => R;
 }
 
 declare module 'vitest' {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-explicit-any
-  interface Assertion<T = any> extends CustomMatchers<T> {}
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  interface AsymmetricMatchersContaining extends CustomMatchers {}
+  interface Assertion<T = unknown> extends MyCustomMatchers<T>, customMatchers {}
+  interface AsymmetricMatchersContaining extends MyCustomMatchers, customMatchers {}
+  interface ExpectStatic extends CustomMatchers, MyCustomMatchers {}
 }
 
 export {};

@@ -20,7 +20,7 @@ export type StageTypesTemplate = Record<string, StageData>;
 
 export type Stage<StageType extends string, StageInfo extends StageData = StageData> = Prettify<
   Omit<components['schemas']['stageResponse'], StageGenericProperties> & {
-    userMetadata: StageInfo['userMetadata'];
+    userMetadata?: StageInfo['userMetadata'];
     data: StageInfo['data'];
     type: StageType;
   }

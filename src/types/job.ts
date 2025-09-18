@@ -16,7 +16,7 @@ export type InferJobData<JobName, JobTypes> = JobName extends Extract<keyof JobT
 
 export type Job<JobName extends string, JobInfo extends JobData = JobData> = Prettify<
   Omit<components['schemas']['job'], JobGenericProperties> & {
-    userMetadata: JobInfo['userMetadata'];
+    userMetadata?: JobInfo['userMetadata'];
     data: JobInfo['data'];
     name: JobName;
   }
