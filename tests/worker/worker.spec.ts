@@ -11,6 +11,7 @@ import type { StageId, TaskId } from '../../src/types/brands';
 import type { Task, TaskData } from '../../src/types/task';
 import type { Logger } from '../../src/types';
 import type { TaskHandler, WorkerOptions } from '../../src/types/worker';
+import { Producer } from '../../src/clients';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
@@ -92,7 +93,7 @@ describe('Worker', () => {
       pullingInterval: 500,
     };
 
-    worker = new Worker(taskHandler, stageType, workerOptions, logger, apiClient);
+    worker = new Worker(taskHandler, stageType, workerOptions, logger, apiClient, new Producer(apiClient, logger));
   });
 
   afterEach(async () => {
