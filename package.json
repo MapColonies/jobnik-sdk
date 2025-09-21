@@ -7,14 +7,6 @@
     ".": {
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./api": {
-      "require": "./dist/api/index.js",
-      "types": "./dist/api/index.d.ts"
-    },
-    "./types": {
-      "require": "./dist/types/index.js",
-      "types": "./dist/types/index.d.ts"
     }
   },
   "scripts": {
