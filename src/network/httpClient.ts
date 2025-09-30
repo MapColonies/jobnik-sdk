@@ -63,12 +63,6 @@ interface HttpClientOptions {
    * Options for the underlying agent.
    */
   agentOptions?: Agent.Options;
-
-  /**
-   * Logger instance for client operations.
-   * @default new NoopLogger()
-   */
-  logger?: Logger;
 }
 
 /**
@@ -121,8 +115,7 @@ const JITTER_MIN_FACTOR = 0.5;
 /**
  * Creates a RetryAgent with proper configuration for network resilience.
  */
-export function createRetryAgent(options: HttpClientOptions = {}): Dispatcher {
-  const logger = options.logger ?? new NoopLogger();
+export function createRetryAgent(options: HttpClientOptions = {}, logger: Logger = new NoopLogger()): Dispatcher {
   const agentOptions = options.agentOptions ?? {};
   const retryOptions = options.retry ?? {};
   const initialBaseRetryDelayMs = retryOptions.initialBaseRetryDelayMs ?? INITIAL_BASE_RETRY_DELAY_MS;
