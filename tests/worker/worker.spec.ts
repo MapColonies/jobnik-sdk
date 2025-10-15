@@ -179,6 +179,34 @@ describe('Worker', () => {
         expect(taskStartedEvents).toHaveLength(2);
       });
 
+      it('should successfully fetch and provide task parents (stage and job) to task handler', async () => {
+        const mockTask = createMockTask({ id: 'task-parents' as TaskId });
+        const stageId = mockTask.stageId;
+        const jobId = 'job-parents-123';
+
+        const mockStage = { id: stageId, jobId, type: stageType, userMetadata: { stageInfo: 'test' } };
+        const mockJob = { id: jobId, type: 'image-processing', userMetadata: { jobInfo: 'test' } };
+
+        taskHandler.mockImplementation(async (_task, context) => {
+          await sleep(1);
+          expect(context.stage).toEqual(mockStage);
+          expect(context.job).toEqual(mockJob);
+        });
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStage));
+        mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(200, JSON.stringify(mockJob));
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        expect(taskHandler).toHaveBeenCalledTimes(1);
+      });
+
       it('should ');
     });
 
@@ -303,6 +331,102 @@ describe('Worker', () => {
 
         const errorEvents = events.filter((e) => e.type === 'error');
         expect(errorEvents).toHaveLength(1);
+      });
+
+      it('should handle stage fetch failure', async () => {
+        const mockTask = createMockTask({ id: 'task-stage-fetch-fail' as TaskId });
+        const stageId = mockTask.stageId;
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(404, JSON.stringify({ error: 'Stage not found' }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+
+        const events = collectEvents(worker);
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        const taskFailedEvent = events.find((e) => e.type === 'taskFailed');
+        expect(taskFailedEvent).toBeDefined();
+        expect(taskFailedEvent?.data).toMatchObject({
+          taskId: mockTask.id,
+          stageType,
+        });
+      });
+
+      it('should handle stage fetch error (500)', async () => {
+        const mockTask = createMockTask({ id: 'task-stage-fetch-error' as TaskId });
+        const stageId = mockTask.stageId;
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(500, JSON.stringify({ error: 'Internal Server Error' }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+
+        const events = collectEvents(worker);
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        const taskFailedEvent = events.find((e) => e.type === 'taskFailed');
+        expect(taskFailedEvent).toBeDefined();
+      });
+
+      it('should handle job fetch failure after successful stage fetch', async () => {
+        const mockTask = createMockTask({ id: 'task-job-fetch-fail' as TaskId });
+        const stageId = mockTask.stageId;
+        const jobId = 'job-not-found';
+
+        const mockStage = { id: stageId, jobId, type: stageType, userMetadata: {} };
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStage));
+        mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(404, JSON.stringify({ error: 'Job not found' }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+
+        const events = collectEvents(worker);
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        const taskFailedEvent = events.find((e) => e.type === 'taskFailed');
+        expect(taskFailedEvent).toBeDefined();
+        expect(taskFailedEvent?.data).toMatchObject({
+          taskId: mockTask.id,
+          stageType,
+        });
+      });
+
+      it('should handle job fetch error (500) after successful stage fetch', async () => {
+        const mockTask = createMockTask({ id: 'task-job-fetch-error' as TaskId });
+        const stageId = mockTask.stageId;
+        const jobId = 'job-server-error';
+
+        const mockStage = { id: stageId, jobId, type: stageType, userMetadata: {} };
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStage));
+        mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(500, JSON.stringify({ error: 'Internal Server Error' }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+
+        const events = collectEvents(worker);
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        const taskFailedEvent = events.find((e) => e.type === 'taskFailed');
+        expect(taskFailedEvent).toBeDefined();
       });
     });
   });
@@ -474,6 +598,233 @@ describe('Worker', () => {
         expect(context?.logger).toBeDefined();
         expect(context?.producer).toBeDefined();
         expect(context?.apiClient).toBeDefined();
+      });
+    });
+  });
+
+  describe('Metadata Update Functions', () => {
+    describe('Happy Path', () => {
+      it('should successfully update job user metadata', async () => {
+        const mockTask = createMockTask({ id: 'task-job-metadata' as TaskId });
+        const jobId = 'job-123';
+        const newMetadata = { processedAt: '2025-10-15T12:00:00Z', status: 'completed' };
+
+        taskHandler.mockImplementation(async (_task, context) => {
+          await context.updateJobUserMetadata(newMetadata);
+        });
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool
+          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: mockTask.stageId, jobId, type: stageType, userMetadata: {} }));
+        mockPool
+          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
+        mockPool.intercept({ path: `/jobs/${jobId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        expect(taskHandler).toHaveBeenCalledTimes(1);
+      });
+
+      it('should successfully update stage user metadata', async () => {
+        const mockTask = createMockTask({ id: 'task-stage-metadata' as TaskId });
+        const stageId = mockTask.stageId;
+        const jobId = 'job-456';
+        const newMetadata = { tasksCompleted: 42, averageProcessingTime: 2500 };
+
+        taskHandler.mockImplementation(async (_task, context) => {
+          await context.updateStageUserMetadata(newMetadata);
+        });
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool
+          .intercept({ path: `/stages/${stageId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: stageId, jobId, type: stageType, userMetadata: {} }));
+        mockPool
+          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
+        mockPool.intercept({ path: `/stages/${stageId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        expect(taskHandler).toHaveBeenCalledTimes(1);
+      });
+
+      it('should successfully update task user metadata', async () => {
+        const mockTask = createMockTask({ id: 'task-task-metadata' as TaskId });
+        const taskId = mockTask.id;
+        const jobId = 'job-789';
+        const newMetadata = { attempts: 1, lastError: null, processingNode: 'worker-01' };
+
+        taskHandler.mockImplementation(async (_task, context) => {
+          await context.updateTaskUserMetadata(newMetadata);
+        });
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool
+          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: mockTask.stageId, jobId, type: stageType, userMetadata: {} }));
+        mockPool
+          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
+        mockPool.intercept({ path: `/tasks/${taskId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        expect(taskHandler).toHaveBeenCalledTimes(1);
+      });
+
+      it('should successfully update multiple metadata types in one task', async () => {
+        const mockTask = createMockTask({ id: 'task-multi-metadata' as TaskId });
+        const stageId = mockTask.stageId;
+        const taskId = mockTask.id;
+        const jobId = 'job-multi';
+
+        taskHandler.mockImplementation(async (_task, context) => {
+          await context.updateJobUserMetadata({ jobStatus: 'processing' });
+          await context.updateStageUserMetadata({ stageProgress: 50 });
+          await context.updateTaskUserMetadata({ taskInfo: 'updated' });
+        });
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool
+          .intercept({ path: `/stages/${stageId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: stageId, jobId, type: stageType, userMetadata: {} }));
+        mockPool
+          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
+        mockPool.intercept({ path: `/jobs/${jobId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/stages/${stageId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/tasks/${taskId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        expect(taskHandler).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('Sad Path', () => {
+      it('should handle job metadata update failure', async () => {
+        const mockTask = createMockTask({ id: 'task-job-metadata-fail' as TaskId });
+        const jobId = 'job-fail';
+        const newMetadata = { shouldFail: true };
+
+        taskHandler.mockImplementation(async (_task, context) => {
+          await context.updateJobUserMetadata(newMetadata);
+        });
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool
+          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: mockTask.stageId, jobId, type: stageType, userMetadata: {} }));
+        mockPool
+          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
+        mockPool.intercept({ path: `/jobs/${jobId}/user-metadata`, method: 'PATCH' }).reply(500, JSON.stringify({ error: 'Internal Server Error' }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+
+        const events = collectEvents(worker);
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        expect(taskHandler).toHaveBeenCalledTimes(1);
+        const taskFailedEvent = events.find((e) => e.type === 'taskFailed');
+        expect(taskFailedEvent).toBeDefined();
+      });
+
+      it('should handle stage metadata update failure', async () => {
+        const mockTask = createMockTask({ id: 'task-stage-metadata-fail' as TaskId });
+        const stageId = mockTask.stageId;
+        const jobId = 'job-stage-fail';
+        const newMetadata = { shouldFail: true };
+
+        taskHandler.mockImplementation(async (_task, context) => {
+          await context.updateStageUserMetadata(newMetadata);
+        });
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool
+          .intercept({ path: `/stages/${stageId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: stageId, jobId, type: stageType, userMetadata: {} }));
+        mockPool
+          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
+        mockPool
+          .intercept({ path: `/stages/${stageId}/user-metadata`, method: 'PATCH' })
+          .reply(500, JSON.stringify({ error: 'Internal Server Error' }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+
+        const events = collectEvents(worker);
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        expect(taskHandler).toHaveBeenCalledTimes(1);
+        const taskFailedEvent = events.find((e) => e.type === 'taskFailed');
+        expect(taskFailedEvent).toBeDefined();
+      });
+
+      it('should handle task metadata update failure', async () => {
+        const mockTask = createMockTask({ id: 'task-task-metadata-fail' as TaskId });
+        const taskId = mockTask.id;
+        const jobId = 'job-task-fail';
+        const newMetadata = { shouldFail: true };
+
+        taskHandler.mockImplementation(async (_task, context) => {
+          await context.updateTaskUserMetadata(newMetadata);
+        });
+
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool
+          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: mockTask.stageId, jobId, type: stageType, userMetadata: {} }));
+        mockPool
+          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
+        mockPool
+          .intercept({ path: `/tasks/${taskId}/user-metadata`, method: 'PATCH' })
+          .reply(500, JSON.stringify({ error: 'Internal Server Error' }));
+        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+
+        const events = collectEvents(worker);
+
+        void worker.start();
+        await vi.advanceTimersByTimeAsync(10000);
+        vi.runAllTicks();
+        await worker.stop();
+
+        expect(taskHandler).toHaveBeenCalledTimes(1);
+        const taskFailedEvent = events.find((e) => e.type === 'taskFailed');
+        expect(taskFailedEvent).toBeDefined();
       });
     });
   });
