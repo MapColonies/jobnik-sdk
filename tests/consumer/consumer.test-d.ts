@@ -41,7 +41,7 @@ describe('Consumer dequeueTask type tests', () => {
 
     const taskPromise = consumer.dequeueTask('bar');
 
-    expectTypeOf(taskPromise).resolves.exclude<null>().toHaveProperty('userMetadata').toEqualTypeOf<{ e: string }>();
+    expectTypeOf(taskPromise).resolves.exclude<null>().toHaveProperty('userMetadata').toEqualTypeOf<{ e: string } | undefined>();
     expectTypeOf(taskPromise).resolves.exclude<null>().toHaveProperty('data').toEqualTypeOf<{ f: number }>();
   });
 
@@ -58,7 +58,7 @@ describe('Consumer dequeueTask type tests', () => {
 
     const taskPromise = consumer.dequeueTask('unknown');
 
-    expectTypeOf(taskPromise).resolves.exclude<null>().toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown>>();
+    expectTypeOf(taskPromise).resolves.exclude<null>().toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown> | undefined>();
     expectTypeOf(taskPromise).resolves.exclude<null>().toHaveProperty('data').toEqualTypeOf<Record<string, unknown>>();
   });
 
@@ -86,12 +86,12 @@ describe('Consumer dequeueTask type tests', () => {
 
     // Test stage1
     const result1 = consumer.dequeueTask('stage1');
-    expectTypeOf(result1).resolves.exclude<null>().toHaveProperty('userMetadata').toEqualTypeOf<{ priority: number }>();
+    expectTypeOf(result1).resolves.exclude<null>().toHaveProperty('userMetadata').toEqualTypeOf<{ priority: number } | undefined>();
     expectTypeOf(result1).resolves.exclude<null>().toHaveProperty('data').toEqualTypeOf<{ input: string }>();
 
     // Test stage2
     const result2 = consumer.dequeueTask('stage2');
-    expectTypeOf(result2).resolves.exclude<null>().toHaveProperty('userMetadata').toEqualTypeOf<{ batch: boolean }>();
+    expectTypeOf(result2).resolves.exclude<null>().toHaveProperty('userMetadata').toEqualTypeOf<{ batch: boolean } | undefined>();
     expectTypeOf(result2).resolves.exclude<null>().toHaveProperty('data').toEqualTypeOf<{ items: string[] }>();
   });
 });
@@ -103,6 +103,6 @@ describe('Consumer with default generics', () => {
     const taskPromise = consumer.dequeueTask('any-stage-name');
 
     expectTypeOf(taskPromise).resolves.exclude<null>().toHaveProperty('data').toEqualTypeOf<Record<string, unknown>>();
-    expectTypeOf(taskPromise).resolves.exclude<null>().toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown>>();
+    expectTypeOf(taskPromise).resolves.exclude<null>().toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown> | undefined>();
   });
 });

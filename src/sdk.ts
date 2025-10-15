@@ -3,9 +3,8 @@ import { Consumer } from './clients/consumer';
 import { Producer } from './clients/producer';
 import { createApiClient, type ApiClient } from './api';
 import type { Logger } from './types';
-import type { JobData } from './types/job';
-import type { StageData, ValidStageType } from './types/stage';
-import type { InferTaskData } from './types/task';
+import type { JobData, JobTypesTemplate, ValidJobType } from './types/job';
+import type { StageData, StageTypesTemplate, ValidStageType } from './types/stage';
 import type { IWorker, TaskHandler, WorkerOptions } from './types/worker';
 import type { IJobnikSDK } from './types/sdk';
 import type { IProducer } from './types/producer';
@@ -65,8 +64,8 @@ import { NoopLogger } from './telemetry/noopLogger';
  * ```
  */
 export class JobnikSDK<
-  JobTypes extends { [K in keyof JobTypes]: JobData } = Record<string, JobData>,
-  StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
+  JobTypes extends JobTypesTemplate<JobTypes> = Record<string, JobData>,
+  StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>,
 > implements IJobnikSDK<JobTypes, StageTypes>
 {
   private readonly logger: Logger;
@@ -201,11 +200,32 @@ export class JobnikSDK<
    * );
    * ```
    */
-  public createWorker<StageType extends ValidStageType<StageTypes> = string>(
-    taskHandler: TaskHandler<InferTaskData<StageType, StageTypes>, JobTypes, StageTypes>,
+  public createWorker<StageType extends ValidStageType<StageTypes> = string, JobType extends ValidJobType<JobTypes> = string>(
+    taskHandler: TaskHandler<JobTypes, StageTypes, JobType, StageType>,
     stageType: StageType,
     options?: WorkerOptions
   ): IWorker {
-    return new Worker<StageTypes, StageType, JobTypes>(taskHandler, stageType, options ?? {}, this.logger, this.apiClient, this.producer);
+    return new Worker<JobTypes, StageTypes, JobType, StageType>(taskHandler, stageType, options ?? {}, this.logger, this.apiClient, this.producer);
+  }
+
+  /**
+   * Gets the underlying API client for direct API operations.
+   * Use this for advanced scenarios that require direct access to the Jobnik API
+   * beyond the standard producer, consumer, and worker abstractions.
+   *
+   * @returns ApiClient instance configured with the SDK's base URL and HTTP client options
+   *
+   * @example
+   * ```typescript
+   * const apiClient = sdk.getApiClient();
+   *
+   * // Make direct API calls for advanced use cases
+   * const response = await apiClient.GET('/jobs/{id}', {
+   *   params: { path: { id: 'job-123' } }
+   * });
+   * ```
+   */
+  public getApiClient(): ApiClient {
+    return this.apiClient;
   }
 }

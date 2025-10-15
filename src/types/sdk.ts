@@ -1,7 +1,8 @@
+import { ApiClient } from '../api';
 import { IConsumer } from './consumer';
-import { JobData } from './job';
+import { JobData, JobTypesTemplate, ValidJobType } from './job';
 import { IProducer } from './producer';
-import { StageData, ValidStageType } from './stage';
+import { StageData, StageTypesTemplate, ValidStageType } from './stage';
 import { InferTaskData } from './task';
 import { IWorker, TaskHandler, WorkerOptions } from './worker';
 
@@ -38,9 +39,15 @@ import { IWorker, TaskHandler, WorkerOptions } from './worker';
  * ```
  */
 export interface IJobnikSDK<
-  JobTypes extends { [K in keyof JobTypes]: JobData } = Record<string, JobData>,
-  StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
+  JobTypes extends JobTypesTemplate<JobTypes> = Record<string, JobData>,
+  StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>,
 > {
+  /**
+   * Gets the underlying API client for direct API interactions.
+   * @returns ApiClient instance for low-level API calls
+   */
+  getApiClient: () => ApiClient;
+
   /**
    * Gets a consumer client for dequeueing and processing tasks.
    * @returns Consumer instance for task consumption operations
@@ -74,8 +81,8 @@ export interface IJobnikSDK<
    * );
    * ```
    */
-  createWorker: <StageType extends ValidStageType<StageTypes> = string>(
-    taskHandler: TaskHandler<InferTaskData<StageType, StageTypes>, JobTypes, StageTypes>,
+  createWorker: <StageType extends ValidStageType<StageTypes> = string, JobType extends ValidJobType<JobTypes> = string>(
+    taskHandler: TaskHandler<JobTypes, StageTypes, JobType, StageType>,
     stageType: StageType,
     options?: WorkerOptions
   ) => IWorker;

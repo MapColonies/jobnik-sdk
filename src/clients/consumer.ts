@@ -3,7 +3,7 @@ import { StatusCodes } from 'http-status-codes';
 import type { ApiClient } from '../api';
 import type { TaskId } from '../types/brands';
 import type { InferTaskData, Task } from '../types/task';
-import type { ValidStageType, StageData } from '../types/stage';
+import type { ValidStageType, StageTypesTemplate } from '../types/stage';
 import type { components } from '../types/openapi';
 import { withSpan } from '../telemetry/trace';
 import { JOB_MANAGER_TASK_ATTEMPTS, JOB_MANAGER_TASK_STATUS, ATTR_MESSAGING_DESTINATION_NAME, ATTR_MESSAGING_MESSAGE_ID } from '../telemetry/semconv';
@@ -35,7 +35,7 @@ import { JOBNIK_SDK_ERROR_CODES, ConsumerError } from '../errors';
  * ```
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } = {}> implements IConsumer<StageTypes> {
+export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> implements IConsumer<StageTypes> {
   /**
    * Creates a new Consumer instance.
    *

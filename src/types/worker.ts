@@ -1,11 +1,12 @@
 import type { Options as OpossumOptions } from 'opossum';
 import type { Logger } from '../telemetry/logger';
 import type { ScopedApiClient } from '../api';
-import type { Task, TaskData } from './task';
+import type { InferTaskData, Task } from './task';
 import type { TaskId } from './brands';
-import type { StageData } from './stage';
+import type { InferStageData, Stage, StageData, StageTypesTemplate, ValidStageType } from './stage';
 import type { IProducer } from './producer';
-import type { JobData } from './job';
+import type { InferJobData, Job, JobData, JobTypesTemplate, ValidJobType } from './job';
+import type { Prettify } from './utils';
 
 /**
  * Configuration options for circuit breaker behavior.
@@ -59,8 +60,10 @@ export interface WorkerOptions {
  * ```
  */
 export interface TaskHandlerContext<
-  JobTypes extends { [K in keyof JobTypes]: JobData } = Record<string, JobData>,
-  StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
+  JobTypes extends JobTypesTemplate<JobTypes> = Record<string, JobData>,
+  StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>,
+  JobType extends ValidJobType<JobTypes> = string,
+  StageType extends ValidStageType<StageTypes> = string,
 > {
   /** Cancellation signal that aborts when worker stops */
   signal: AbortSignal;
@@ -70,6 +73,16 @@ export interface TaskHandlerContext<
   producer: IProducer<JobTypes, StageTypes>;
   /** Scoped API client for safe task operations */
   apiClient: ScopedApiClient; // Scoped for safety
+  /** The stage associated with the task */
+  stage: Prettify<Stage<StageType, InferStageData<StageType, StageTypes>>>;
+  /** The job associated with the stage */
+  job: Prettify<Job<JobTypes, JobType>>;
+  /** Updates userMetadata for the associated job */
+  updateJobUserMetadata: (metadata: Prettify<InferJobData<JobType, JobTypes>['userMetadata']>) => Promise<void>;
+  /** Updates userMetadata for the associated stage */
+  updateStageUserMetadata: (metadata: Prettify<InferStageData<StageType, StageTypes>['userMetadata']>) => Promise<void>;
+
+  updateTaskUserMetadata: (metadata: Prettify<InferTaskData<StageType, StageTypes>['userMetadata']>) => Promise<void>;
 }
 
 /**
@@ -103,10 +116,15 @@ export interface TaskHandlerContext<
  * ```
  */
 export type TaskHandler<
-  TaskPayload extends TaskData,
-  JobTypes extends { [K in keyof JobTypes]: JobData } = Record<string, JobData>,
-  StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
-> = (task: Task<TaskPayload>, context: TaskHandlerContext<JobTypes, StageTypes>) => Promise<void>;
+  // TaskPayload extends TaskData,
+  JobTypes extends JobTypesTemplate<JobTypes> = Record<string, JobData>,
+  StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>,
+  JobType extends ValidJobType<JobTypes> = string,
+  StageType extends ValidStageType<StageTypes> = string,
+> = (
+  task: Prettify<Task<InferTaskData<StageType, StageTypes>>>,
+  context: Prettify<TaskHandlerContext<JobTypes, StageTypes, JobType, StageType>>
+) => Promise<void>;
 
 /**
  * Event data types emitted by worker instances during task processing.
@@ -143,11 +161,7 @@ export interface WorkerEvents {
  * @template StageTypes - Stage type definitions mapping stage names to their data structures
  * @template StageType - Specific stage type this worker processes (must be key of StageTypes)
  */
-export interface IWorker<
-  // StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
-  // // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // StageType extends ValidStageType<StageTypes> = string,
-> {
+export interface IWorker<> {
   /**
    * Starts the worker and begins processing tasks from the specified stage.
    * @returns Promise that resolves when the worker stops (via stop() call)

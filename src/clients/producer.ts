@@ -2,8 +2,8 @@ import { type Span, SpanKind, SpanStatusCode, context, propagation, trace } from
 import type { ApiClient } from '../api';
 import type { components } from '../types/openapi';
 import type { JobId, StageId } from '../types/brands';
-import type { InferJobData, Job, JobData, NewJob, ValidJobName } from '../types/job';
-import type { InferStageData, NewStage, Stage, StageData, ValidStageType } from '../types/stage';
+import type { Job, JobData, JobTypesTemplate, NewJob, ValidJobType } from '../types/job';
+import type { InferStageData, NewStage, Stage, StageData, StageTypesTemplate, ValidStageType } from '../types/stage';
 import type { InferTaskData, NewTask, Task } from '../types/task';
 import type { IProducer } from '../types/producer';
 import { tracer, withSpan } from '../telemetry/trace';
@@ -51,8 +51,8 @@ const DEFAULT_PRIORITY: Extract<components['schemas']['priority'], 'MEDIUM'> = '
  * ```
  */
 export class Producer<
-  JobTypes extends { [K in keyof JobTypes]: JobData } = Record<string, JobData>,
-  StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
+  JobTypes extends JobTypesTemplate<JobTypes> = Record<string, JobData>,
+  StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>,
 > implements IProducer<JobTypes, StageTypes>
 {
   /**
@@ -85,9 +85,7 @@ export class Producer<
    * });
    * ```
    */
-  public async createJob<JobName extends ValidJobName<JobTypes>>(
-    jobData: NewJob<JobName, InferJobData<JobName, JobTypes>>
-  ): Promise<Job<JobName, InferJobData<JobName, JobTypes>>> {
+  public async createJob<JobType extends ValidJobType<JobTypes> = ''>(jobData: NewJob<JobTypes, JobType>): Promise<Job<JobTypes, JobType>> {
     const startTime = performance.now();
 
     this.logger.debug('Starting job creation', {
@@ -135,7 +133,7 @@ export class Producer<
         });
 
         span.setAttribute(ATTR_MESSAGING_MESSAGE_CONVERSATION_ID, data.id);
-        return data as Job<JobName, InferJobData<JobName, JobTypes>>;
+        return data;
       }
     );
   }

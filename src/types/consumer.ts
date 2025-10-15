@@ -6,11 +6,11 @@
  */
 
 import type { TaskId } from './brands';
-import type { StageData, ValidStageType } from './stage';
+import type { StageTypesTemplate, ValidStageType } from './stage';
 import type { InferTaskData, Task } from './task';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface IConsumer<StageTypes extends { [K in keyof StageTypes]: StageData } = {}> {
+export interface IConsumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> {
   /**
    * Dequeues the highest priority pending task of the specified stage type.
    * @param stageType - Stage type to dequeue tasks from

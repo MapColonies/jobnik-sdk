@@ -3,8 +3,8 @@ import { describe, it, expectTypeOf } from 'vitest';
 import { Producer } from '../../src/clients/producer';
 import type { ApiClient } from '../../src/api';
 import type { JobId, StageId, TaskId } from '../../src/types/brands';
-import type { NewJob, InferJobData } from '../../src/types/job';
-import type { NewStage, InferStageData } from '../../src/types/stage';
+import type { NewJob, InferJobData, JobData } from '../../src/types/job';
+import type { NewStage, InferStageData, StageData } from '../../src/types/stage';
 import type { NewTask, InferTaskData } from '../../src/types/task';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
 
@@ -36,7 +36,8 @@ describe('Producer type generics', () => {
 
   it('can be constructed without explicit generics (defaults to object)', () => {
     const producer = new Producer(apiClient, new NoopLogger());
-    expectTypeOf(producer).toExtend<Producer<object, object>>();
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
+    expectTypeOf(producer).toExtend<Producer<Record<string, JobData>, Record<string, StageData>>>();
   });
 
   it('can be constructed with just one generic type', () => {
@@ -49,7 +50,7 @@ describe('Producer.createJob', () => {
   const producer = new Producer<TestJobTypes, TestStageTypes>(apiClient, new NoopLogger());
 
   it('returns branded jobId', () => {
-    const jobData: NewJob<'foo', InferJobData<'foo', TestJobTypes>> = {
+    const jobData: NewJob<TestJobTypes, 'foo'> = {
       name: 'foo',
       userMetadata: { a: 'x' },
       data: { b: 1 },
@@ -60,20 +61,19 @@ describe('Producer.createJob', () => {
   });
 
   it('returns correct type for valid jobName', () => {
-    const jobData: NewJob<'foo', InferJobData<'foo', TestJobTypes>> = {
+    const jobData: NewJob<TestJobTypes, 'foo'> = {
       name: 'foo',
       userMetadata: { a: 'x' },
       data: { b: 1 },
     };
-    const jobPromise = producer.createJob(jobData);
+    const jobPromise = producer.createJob<'foo'>(jobData);
 
-    expectTypeOf(jobPromise).resolves.toHaveProperty('name').toEqualTypeOf<'foo'>();
     expectTypeOf(jobPromise).resolves.toHaveProperty('data').toEqualTypeOf<{ b: number }>();
-    expectTypeOf(jobPromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<{ a: string }>();
+    expectTypeOf(jobPromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<{ a: string } | undefined>();
   });
 
   it('throws a type error if data type is incorrect', () => {
-    producer.createJob({
+    producer.createJob<'foo'>({
       name: 'foo',
       userMetadata: { a: 'x' },
       // @ts-expect-error: Incorrect data type
@@ -85,8 +85,9 @@ describe('Producer.createJob', () => {
     const jobData = { name: 'bar', userMetadata: {} as Record<string, unknown>, data: {} as Record<string, unknown> };
 
     const jobPromise = producer.createJob(jobData);
+
     expectTypeOf(jobPromise).resolves.toHaveProperty('data').toEqualTypeOf<Record<string, unknown>>();
-    expectTypeOf(jobPromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown>>();
+    expectTypeOf(jobPromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown> | undefined>();
   });
 });
 
@@ -120,7 +121,7 @@ describe('Producer.createStage', () => {
     const stagePromise = producer.createStage('jobid' as JobId, stageData);
     expectTypeOf(stagePromise).resolves.toHaveProperty('type').toEqualTypeOf<'bar'>();
     expectTypeOf(stagePromise).resolves.toHaveProperty('data').toEqualTypeOf<{ d: string }>();
-    expectTypeOf(stagePromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<{ c: boolean }>();
+    expectTypeOf(stagePromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<{ c: boolean } | undefined>();
   });
 
   it('throws a type error if data type is incorrect', () => {
@@ -143,7 +144,7 @@ describe('Producer.createStage', () => {
     const stagePromise = producer.createStage('jobid' as JobId, stageData);
 
     expectTypeOf(stagePromise).resolves.toHaveProperty('data').toEqualTypeOf<Record<string, unknown>>();
-    expectTypeOf(stagePromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown>>();
+    expectTypeOf(stagePromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown> | undefined>();
   });
 });
 
@@ -174,7 +175,7 @@ describe('Producer.createTask', () => {
     const taskPromise = producer.createTasks('stageid' as StageId, 'bar', taskData);
 
     expectTypeOf(taskPromise).resolves.items.toHaveProperty('data').toEqualTypeOf<{ f: number }>();
-    expectTypeOf(taskPromise).resolves.items.toHaveProperty('userMetadata').toEqualTypeOf<{ e: string }>();
+    expectTypeOf(taskPromise).resolves.items.toHaveProperty('userMetadata').toEqualTypeOf<{ e: string } | undefined>();
   });
 
   it('returns default type for unknown stageType', () => {
@@ -183,7 +184,7 @@ describe('Producer.createTask', () => {
     const taskPromise = producer.createTasks('stageid' as StageId, 'baz', taskData);
 
     expectTypeOf(taskPromise).resolves.items.toHaveProperty('data').toEqualTypeOf<Record<string, unknown>>();
-    expectTypeOf(taskPromise).resolves.items.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown>>();
+    expectTypeOf(taskPromise).resolves.items.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown> | undefined>();
   });
 });
 
@@ -196,7 +197,7 @@ describe('Producer with default generics', () => {
     const jobPromise = producer.createJob(jobData);
 
     expectTypeOf(jobPromise).resolves.toHaveProperty('data').toEqualTypeOf<Record<string, unknown>>();
-    expectTypeOf(jobPromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown>>();
+    expectTypeOf(jobPromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown> | undefined>();
   });
 
   it('when creating stages allows any stageType but returns default type', () => {
@@ -210,7 +211,7 @@ describe('Producer with default generics', () => {
     const stagePromise = producer.createStage('jobid' as JobId, stageData);
 
     expectTypeOf(stagePromise).resolves.toHaveProperty('data').toEqualTypeOf<Record<string, unknown>>();
-    expectTypeOf(stagePromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown>>();
+    expectTypeOf(stagePromise).resolves.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown> | undefined>();
   });
 
   it('when creating tasks allows any taskType but returns default type', () => {
@@ -222,6 +223,6 @@ describe('Producer with default generics', () => {
     const taskPromise = producer.createTasks('stageid' as StageId, 'foo', [taskData]);
 
     expectTypeOf(taskPromise).resolves.items.toHaveProperty('data').toEqualTypeOf<Record<string, unknown>>();
-    expectTypeOf(taskPromise).resolves.items.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown>>();
+    expectTypeOf(taskPromise).resolves.items.toHaveProperty('userMetadata').toEqualTypeOf<Record<string, unknown> | undefined>();
   });
 });

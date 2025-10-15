@@ -1,6 +1,6 @@
 import type { JobId, StageId } from './brands';
-import type { InferJobData, Job, JobData, NewJob, ValidJobName } from './job';
-import type { InferStageData, NewStage, Stage, StageData, ValidStageType } from './stage';
+import type { Job, JobData, JobTypesTemplate, NewJob, ValidJobType } from './job';
+import type { InferStageData, NewStage, Stage, StageData, StageTypesTemplate, ValidStageType } from './stage';
 import type { InferTaskData, NewTask, Task } from './task';
 
 /**
@@ -10,17 +10,15 @@ import type { InferTaskData, NewTask, Task } from './task';
  * @template StageTypes - Interface defining stage types with their metadata, data, and task schemas
  */
 export interface IProducer<
-  JobTypes extends { [K in keyof JobTypes]: JobData } = Record<string, JobData>,
-  StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
+  JobTypes extends JobTypesTemplate<JobTypes> = Record<string, JobData>,
+  StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>,
 > {
   /**
    * Creates a new job in the system.
    * @param jobData - Job configuration including name, metadata, and data
    * @returns Promise resolving to the created job with assigned ID
    */
-  createJob: <JobName extends ValidJobName<JobTypes>>(
-    jobData: NewJob<JobName, InferJobData<JobName, JobTypes>>
-  ) => Promise<Job<JobName, InferJobData<JobName, JobTypes>>>;
+  createJob: <JobType extends ValidJobType<JobTypes>>(jobData: NewJob<JobTypes, JobType>) => Promise<Job<JobTypes, JobType>>;
 
   /**
    * Creates a stage within an existing job.

@@ -3,19 +3,21 @@ import circuitBreaker, { type Options as OpossumOptions } from 'opossum';
 import { context, propagation, type Span, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
 import type { ApiClient } from '../api';
 import type { Logger } from '../types';
-import type { StageData, ValidStageType } from '../types/stage';
+import type { Stage, StageData, StageTypesTemplate, ValidStageType } from '../types/stage';
 import { getErrorMessageFromUnknown, presult } from '../common/utils';
-import type { InferTaskData, Task } from '../types/task';
+import type { Task } from '../types/task';
 import {
   ATTR_JOB_MANAGER_STAGE_ID,
   ATTR_MESSAGING_BATCH_MESSAGE_COUNT,
   ATTR_MESSAGING_DESTINATION_NAME,
   ATTR_MESSAGING_MESSAGE_ID,
 } from '../telemetry/semconv';
-import type { JobData } from '../types/job';
+import type { Job, JobData, JobTypesTemplate, ValidJobType } from '../types/job';
 import { BASE_ATTRIBUTES, tracer } from '../telemetry/trace';
 import type { IWorker, TaskHandler, TaskHandlerContext, WorkerOptions } from '../types/worker';
 import type { IProducer } from '../types/producer';
+import { WorkerError } from '../errors/sdkErrors';
+import type { JobId, StageId, TaskId } from '../types/brands';
 import { BaseWorker } from './base-worker';
 
 /** Default polling interval in milliseconds for task dequeue operations */
@@ -113,9 +115,10 @@ const defaultCircuitBreakerOptions = {
  * ```
  */
 export class Worker<
-    StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>,
+    JobTypes extends JobTypesTemplate<JobTypes> = Record<string, JobData>,
+    StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>,
+    JobType extends ValidJobType<JobTypes> = string,
     StageType extends ValidStageType<StageTypes> = string,
-    JobTypes extends { [K in keyof JobTypes]: JobData } = Record<string, JobData>,
   >
   extends BaseWorker<StageTypes>
   implements IWorker
@@ -123,7 +126,7 @@ export class Worker<
   /** Abort controller for coordinated shutdown and task cancellation */
   private readonly abortController = new AbortController();
   /** Circuit breaker protecting task handler execution from failures */
-  private readonly taskHandlerCircuitBreaker: circuitBreaker<[Task, TaskHandlerContext<JobTypes, StageTypes>]>;
+  private readonly taskHandlerCircuitBreaker: circuitBreaker<[Task, TaskHandlerContext<JobTypes, StageTypes, JobType, StageType>]>;
   /** Promise for waiting on task circuit breaker state changes */
   private taskCircuitBreakerPromise: Promise<void> | null = null;
   /** Resolver function for task circuit breaker promise */
@@ -168,7 +171,7 @@ export class Worker<
    * ```
    */
   public constructor(
-    private readonly taskHandler: TaskHandler<InferTaskData<StageType, StageTypes>, JobTypes, StageTypes>,
+    private readonly taskHandler: TaskHandler<JobTypes, StageTypes, JobType, StageType>,
     private readonly stageType: StageType,
     private readonly options: WorkerOptions,
     logger: Logger,
@@ -327,17 +330,24 @@ export class Worker<
 
     this.emit('taskStarted', { taskId: task.id, stageType: this.stageType });
 
-    const taskContext = {
-      signal: this.abortController.signal,
-      logger: this.logger,
-      producer: this.producer,
-      apiClient: this.apiClient,
-    };
-
     const wrapHandler = async (): Promise<void> => {
       const ctx = trace.setSpan(context.active(), span);
       await context.with(ctx, async () => {
         try {
+          const taskParents = await this.fetchTaskParents(task);
+
+          const taskContext = {
+            signal: this.abortController.signal,
+            logger: this.logger,
+            producer: this.producer,
+            apiClient: this.apiClient,
+            job: taskParents.job,
+            stage: taskParents.stage,
+            updateJobUserMetadata: this.getUpdateJobUserMetadataFunction(taskParents.job.id),
+            updateStageUserMetadata: this.getUpdateStageUserMetadataFunction(taskParents.stage.id),
+            updateTaskUserMetadata: this.getUpdateTaskUserMetadataFunction(task.id),
+          };
+
           this.logger.debug('Task handler firing', {
             taskId: task.id,
             stageType: this.stageType,
@@ -345,7 +355,7 @@ export class Worker<
 
           const startTime = performance.now();
 
-          await this.taskHandlerCircuitBreaker.fire(task, taskContext);
+          await this.taskHandlerCircuitBreaker.fire(task, taskContext as unknown as TaskHandlerContext<JobTypes, StageTypes, JobType, StageType>);
           this.logger.debug('Task handler succeeded', { taskId: task.id, stageType: this.stageType });
           await this.markTask('COMPLETED', { task, taskId: undefined });
 
@@ -598,5 +608,71 @@ export class Worker<
       this.logger.info('Task handler circuit breaker half-opened', { stageType: this.stageType });
       this.resolveTaskCircuitBreaker();
     });
+  }
+
+  private async fetchTaskParents(task: Task): Promise<{ job: Job; stage: Stage }> {
+    const { data: stage, error: stageError } = await this.apiClient.GET('/stages/{stageId}', { params: { path: { stageId: task.stageId } } });
+    if (!stage) {
+      throw new WorkerError(`Stage not found for ID ${task.stageId}`, 'FAILED_FETCHING_STAGE', stageError);
+    }
+
+    const { data: job, error: jobError } = await this.apiClient.GET('/jobs/{jobId}', { params: { path: { jobId: stage.jobId } } });
+
+    if (!job) {
+      throw new WorkerError(`Job not found for ID ${stage.jobId}`, 'FAILED_FETCHING_JOB', jobError);
+    }
+
+    return { job, stage };
+  }
+
+  private getUpdateJobUserMetadataFunction(jobId: JobId): (metadata: Record<string, unknown>) => Promise<void> {
+    return async (metadata: Record<string, unknown>) => {
+      const { error } = await this.apiClient.PATCH('/jobs/{jobId}/user-metadata', {
+        params: { path: { jobId } },
+        body: { userMetadata: metadata },
+      });
+
+      if (error) {
+        this.logger.error('Failed to update job user metadata', {
+          jobId,
+          error: getErrorMessageFromUnknown(error),
+        });
+        throw new WorkerError(`Failed to update job user metadata for job ID ${jobId}`, 'FAILED_FETCHING_JOB', error);
+      }
+    };
+  }
+
+  private getUpdateStageUserMetadataFunction(stageId: StageId): (metadata: Record<string, unknown>) => Promise<void> {
+    return async (metadata: Record<string, unknown>) => {
+      const { error } = await this.apiClient.PATCH('/stages/{stageId}/user-metadata', {
+        params: { path: { stageId } },
+        body: { userMetadata: metadata },
+      });
+
+      if (error) {
+        this.logger.error('Failed to update stage user metadata', {
+          stageId,
+          error: getErrorMessageFromUnknown(error),
+        });
+        throw new WorkerError(`Failed to update stage user metadata for stage ID ${stageId}`, 'FAILED_FETCHING_STAGE', error);
+      }
+    };
+  }
+
+  private getUpdateTaskUserMetadataFunction(taskId: TaskId): (metadata: Record<string, unknown>) => Promise<void> {
+    return async (metadata: Record<string, unknown>) => {
+      const { error } = await this.apiClient.PATCH('/tasks/{taskId}/user-metadata', {
+        params: { path: { taskId } },
+        body: { userMetadata: metadata },
+      });
+
+      if (error) {
+        this.logger.error('Failed to update task user metadata', {
+          taskId,
+          error: getErrorMessageFromUnknown(error),
+        });
+        throw new WorkerError(`Failed to update task user metadata for task ID ${taskId}`, 'FAILED_FETCHING_STAGE', error);
+      }
+    };
   }
 }
