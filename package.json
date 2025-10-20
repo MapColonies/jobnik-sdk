@@ -85,7 +85,7 @@
     "@readme/openapi-parser": "^4.0.1",
     "date-fns": "^4.1.0",
     "http-status-codes": "^2.3.0",
-    "openapi-fetch": "^0.14.0",
+    "openapi-fetch": "^0.15.0",
     "opossum": "^9.0.0",
     "undici": "^6.21.3",
     "yaml": "^2.8.1"
