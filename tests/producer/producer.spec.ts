@@ -289,36 +289,6 @@ describe('Producer', () => {
         await expect(response).rejects.toHaveCauseCode(API_ERROR_CODES.JOB_NOT_FOUND);
       });
 
-      it('should throw ProducerError when span context extraction fails', async () => {
-        vi.spyOn(trace, 'getSpanContext').mockReturnValue(undefined);
-        const stageData = {
-          type: 'processing',
-          userMetadata: {},
-          data: {},
-        };
-
-        // Mock GET /jobs/{jobId} with incomplete trace context
-        const mockJobResponse = {
-          id: jobId,
-          name: 'test-job',
-          userMetadata: {},
-          data: {},
-          priority: 'MEDIUM',
-          status: 'PENDING',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-
-        mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(200, JSON.stringify(mockJobResponse), {
-          headers: { 'content-type': 'application/json' },
-        });
-
-        const response = producer.createStage(jobId, stageData);
-
-        await expect(response).rejects.toThrow(ProducerError);
-        await expect(response).rejects.toThrow(`Failed to extract span context for job ${jobId}`);
-      });
-
       it('should throw ProducerError when stage creation fails', async () => {
         const stageData = {
           type: 'processing',
@@ -555,36 +525,6 @@ describe('Producer', () => {
         await expect(response).rejects.toThrow(
           "Stage type mismatch for stage stage-123: server reports 'different-type', but client specified 'processing'"
         );
-      });
-
-      it('should throw ProducerError when span context extraction fails', async () => {
-        const taskData = [
-          {
-            userMetadata: { taskId: 'task-1' },
-            data: { input: 'data1' },
-          },
-        ];
-
-        // Mock GET /stages/{stageId} without trace context
-        const mockStageResponse = {
-          id: stageId,
-          jobId: 'job-123' as JobId,
-          type: stageType,
-          userMetadata: {},
-          data: {},
-          status: 'PENDING',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-
-        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStageResponse), {
-          headers: { 'content-type': 'application/json' },
-        });
-
-        const response = producer.createTasks(stageId, stageType, taskData);
-
-        await expect(response).rejects.toThrow(ProducerError);
-        await expect(response).rejects.toThrow(`Failed to extract span context for stage ${stageId}`);
       });
 
       it('should throw ProducerError when task creation fails', async () => {

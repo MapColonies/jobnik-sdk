@@ -7,6 +7,7 @@ import type { InferStageData, Stage, StageData, StageTypesTemplate, ValidStageTy
 import type { IProducer } from './producer';
 import type { InferJobData, Job, JobData, JobTypesTemplate, ValidJobType } from './job';
 import type { Prettify } from './utils';
+import { IJobnikSDK } from './sdk';
 
 /**
  * Configuration options for circuit breaker behavior.
@@ -205,3 +206,9 @@ export interface IWorker<> {
    */
   removeAllListeners: <K extends keyof WorkerEvents>(event?: K) => this;
 }
+
+export type InferTaskHandler<
+  Sdk extends IJobnikSDK,
+  JobType extends ValidJobType<Sdk['_']['jobTypes']> = string,
+  StageType extends ValidStageType<Sdk['_']['stageTypes']> = string,
+> = TaskHandler<Sdk['_']['jobTypes'], Sdk['_']['stageTypes']>;

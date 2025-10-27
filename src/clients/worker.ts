@@ -233,10 +233,13 @@ export class Worker<
   public async start(): Promise<void> {
     const concurrency = this.options.concurrency ?? 1;
 
-    this.logger.info('Starting worker', {
-      stageType: this.stageType,
-      concurrency,
-    });
+    this.logger.info(
+      {
+        stageType: this.stageType,
+        concurrency,
+      },
+      'Starting worker'
+    );
 
     this.isRunning = true;
 
@@ -246,21 +249,27 @@ export class Worker<
     });
 
     for await (const [task, span] of this.taskIterator()) {
-      this.logger.debug('Dequeued task for processing', {
-        taskId: task.id,
-        runningTasks: this.runningTasks.size,
-        stageType: this.stageType,
-      });
+      this.logger.debug(
+        {
+          taskId: task.id,
+          runningTasks: this.runningTasks.size,
+          stageType: this.stageType,
+        },
+        'Dequeued task for processing'
+      );
 
       this.runTask(task, span);
 
       while (this.runningTasks.size >= concurrency) {
-        this.logger.debug('Concurrency limit reached', {
-          runningTasks: this.runningTasks.size,
-          concurrency,
-          stageType: this.stageType,
-          waiting: true,
-        });
+        this.logger.debug(
+          {
+            runningTasks: this.runningTasks.size,
+            concurrency,
+            stageType: this.stageType,
+            waiting: true,
+          },
+          'Concurrency limit reached'
+        );
         await Promise.race(this.runningTasks);
       }
     }
@@ -295,10 +304,13 @@ export class Worker<
       runningTasks: this.runningTasks.size,
     });
 
-    this.logger.info('Stopping worker', {
-      stageType: this.stageType,
-      runningTasks: this.runningTasks.size,
-    });
+    this.logger.info(
+      {
+        stageType: this.stageType,
+        runningTasks: this.runningTasks.size,
+      },
+      'Stopping worker'
+    );
 
     this.isRunning = false;
     await super.stop();
@@ -306,7 +318,7 @@ export class Worker<
 
     await Promise.allSettled(this.runningTasks);
 
-    this.logger.info('Worker stopped', { stageType: this.stageType });
+    this.logger.info({ stageType: this.stageType }, 'Worker stopped');
 
     this.emit('stopped', { stageType: this.stageType });
   }
@@ -326,7 +338,7 @@ export class Worker<
    * @internal
    */
   private runTask(task: Task, span: Span): void {
-    this.logger.info('Running task', { taskId: task.id, stageType: this.stageType });
+    this.logger.info({ taskId: task.id, stageType: this.stageType }, 'Running task');
 
     this.emit('taskStarted', { taskId: task.id, stageType: this.stageType });
 
@@ -348,15 +360,18 @@ export class Worker<
             updateTaskUserMetadata: this.getUpdateTaskUserMetadataFunction(task.id),
           };
 
-          this.logger.debug('Task handler firing', {
-            taskId: task.id,
-            stageType: this.stageType,
-          });
+          this.logger.debug(
+            {
+              taskId: task.id,
+              stageType: this.stageType,
+            },
+            'Task handler firing'
+          );
 
           const startTime = performance.now();
 
           await this.taskHandlerCircuitBreaker.fire(task, taskContext as unknown as TaskHandlerContext<JobTypes, StageTypes, JobType, StageType>);
-          this.logger.debug('Task handler succeeded', { taskId: task.id, stageType: this.stageType });
+          this.logger.debug({ taskId: task.id, stageType: this.stageType }, 'Task handler succeeded');
           await this.markTask('COMPLETED', { task, taskId: undefined });
 
           this.emit('taskCompleted', { taskId: task.id, stageType: this.stageType, duration: performance.now() - startTime });
@@ -364,20 +379,26 @@ export class Worker<
           span.setStatus({ code: SpanStatusCode.OK });
           span.end();
         } catch (error) {
-          this.logger.warn('Task handler failed', {
-            taskId: task.id,
-            stageType: this.stageType,
-            error: getErrorMessageFromUnknown(error),
-          });
+          this.logger.warn(
+            {
+              taskId: task.id,
+              stageType: this.stageType,
+              error: getErrorMessageFromUnknown(error),
+            },
+            'Task handler failed'
+          );
 
           const [err] = await presult(this.markTask('FAILED', { task, taskId: undefined }));
 
           if (err) {
-            this.logger.error('Error occurred while marking task as failed', {
-              taskId: task.id,
-              stageType: this.stageType,
-              error: getErrorMessageFromUnknown(err),
-            });
+            this.logger.error(
+              {
+                taskId: task.id,
+                stageType: this.stageType,
+                error: getErrorMessageFromUnknown(err),
+              },
+              'Error occurred while marking task as failed'
+            );
 
             this.emit('error', {
               location: 'markTaskFailed',
@@ -401,11 +422,14 @@ export class Worker<
 
     const taskPromise = wrapHandler()
       .catch((error) => {
-        this.logger.error('Error occurred while processing task', {
-          taskId: task.id,
-          stageType: this.stageType,
-          error: getErrorMessageFromUnknown(error),
-        });
+        this.logger.error(
+          {
+            taskId: task.id,
+            stageType: this.stageType,
+            error: getErrorMessageFromUnknown(error),
+          },
+          'Error occurred while processing task'
+        );
 
         this.emit('error', {
           location: 'taskProcessing',
@@ -414,11 +438,14 @@ export class Worker<
         });
       })
       .finally(() => {
-        this.logger.debug('Task promise finished', {
-          taskId: task.id,
-          stageType: this.stageType,
-          runningTasks: this.runningTasks.size,
-        });
+        this.logger.debug(
+          {
+            taskId: task.id,
+            stageType: this.stageType,
+            runningTasks: this.runningTasks.size,
+          },
+          'Task promise finished'
+        );
         this.runningTasks.delete(taskPromise);
       });
 
@@ -445,9 +472,12 @@ export class Worker<
   private async *taskIterator(): AsyncGenerator<[Task, Span]> {
     while (this.isRunning) {
       if (this.taskCircuitBreakerPromise) {
-        this.logger.debug('Waiting for task circuit breaker', {
-          stageType: this.stageType,
-        });
+        this.logger.debug(
+          {
+            stageType: this.stageType,
+          },
+          'Waiting for task circuit breaker'
+        );
 
         await Promise.race([this.taskCircuitBreakerPromise, sleep(this.taskHandlerCbResetTimeout)]);
       }
@@ -466,10 +496,13 @@ export class Worker<
       const [err, task] = await context.with(ctx, async () => presult(this.dequeueTaskCircuitBreaker.fire(this.stageType)));
 
       if (err) {
-        this.logger.debug('Error while dequeuing task', {
-          stageType: this.stageType,
-          error: getErrorMessageFromUnknown(err),
-        });
+        this.logger.debug(
+          {
+            stageType: this.stageType,
+            error: getErrorMessageFromUnknown(err),
+          },
+          'Error while dequeuing task'
+        );
 
         this.emit('error', {
           location: 'taskDequeue',
@@ -486,10 +519,13 @@ export class Worker<
       if (task) {
         this.consecutiveEmptyPolls = 0;
 
-        this.logger.debug('Yielding task from iterator', {
-          taskId: task.id,
-          stageType: this.stageType,
-        });
+        this.logger.debug(
+          {
+            taskId: task.id,
+            stageType: this.stageType,
+          },
+          'Yielding task from iterator'
+        );
 
         const remoteContext = propagation.extract(context.active(), task);
         const taskSpanContext = trace.getSpanContext(remoteContext);
@@ -506,6 +542,13 @@ export class Worker<
         yield [task, span];
         continue;
       } else {
+        this.logger.info(
+          {
+            stageType: this.stageType,
+            consecutiveEmptyPolls: this.consecutiveEmptyPolls + 1,
+          },
+          'No tasks available in queue'
+        );
         this.consecutiveEmptyPolls++;
 
         this.emit('queueEmpty', {
@@ -548,7 +591,7 @@ export class Worker<
    */
   private setupDequeueCircuitBreaker(): void {
     this.dequeueTaskCircuitBreaker.on('open', () => {
-      this.logger.warn('Dequeue task circuit breaker opened', { stageType: this.stageType });
+      this.logger.warn({ stageType: this.stageType }, 'Dequeue task circuit breaker opened');
 
       this.emit('circuitBreakerOpened', {
         breaker: 'dequeueTask',
@@ -557,7 +600,7 @@ export class Worker<
     });
 
     this.dequeueTaskCircuitBreaker.on('close', () => {
-      this.logger.info('Dequeue task circuit breaker closed', { stageType: this.stageType });
+      this.logger.info({ stageType: this.stageType }, 'Dequeue task circuit breaker closed');
 
       this.emit('circuitBreakerClosed', {
         breaker: 'dequeueTask',
@@ -566,7 +609,7 @@ export class Worker<
     });
 
     this.dequeueTaskCircuitBreaker.on('halfOpen', () => {
-      this.logger.info('Dequeue task circuit breaker half-opened', { stageType: this.stageType });
+      this.logger.info({ stageType: this.stageType }, 'Dequeue task circuit breaker half-opened');
     });
   }
 
@@ -581,7 +624,7 @@ export class Worker<
    */
   private setupTaskHandlerCircuitBreaker(): void {
     this.taskHandlerCircuitBreaker.on('open', () => {
-      this.logger.warn('Task handler circuit breaker opened', { stageType: this.stageType });
+      this.logger.warn({ stageType: this.stageType }, 'Task handler circuit breaker opened');
 
       this.emit('circuitBreakerOpened', {
         breaker: 'taskHandler',
@@ -594,7 +637,7 @@ export class Worker<
     });
 
     this.taskHandlerCircuitBreaker.on('close', () => {
-      this.logger.info('Task handler circuit breaker closed', { stageType: this.stageType });
+      this.logger.info({ stageType: this.stageType }, 'Task handler circuit breaker closed');
 
       this.emit('circuitBreakerClosed', {
         breaker: 'taskHandler',
@@ -605,7 +648,7 @@ export class Worker<
     });
 
     this.taskHandlerCircuitBreaker.on('halfOpen', () => {
-      this.logger.info('Task handler circuit breaker half-opened', { stageType: this.stageType });
+      this.logger.info({ stageType: this.stageType }, 'Task handler circuit breaker half-opened');
       this.resolveTaskCircuitBreaker();
     });
   }
@@ -633,10 +676,13 @@ export class Worker<
       });
 
       if (error) {
-        this.logger.error('Failed to update job user metadata', {
-          jobId,
-          error: getErrorMessageFromUnknown(error),
-        });
+        this.logger.error(
+          {
+            jobId,
+            error: getErrorMessageFromUnknown(error),
+          },
+          'Failed to update job user metadata'
+        );
         throw new WorkerError(`Failed to update job user metadata for job ID ${jobId}`, 'FAILED_FETCHING_JOB', error);
       }
     };
@@ -650,10 +696,13 @@ export class Worker<
       });
 
       if (error) {
-        this.logger.error('Failed to update stage user metadata', {
-          stageId,
-          error: getErrorMessageFromUnknown(error),
-        });
+        this.logger.error(
+          {
+            stageId,
+            error: getErrorMessageFromUnknown(error),
+          },
+          'Failed to update stage user metadata'
+        );
         throw new WorkerError(`Failed to update stage user metadata for stage ID ${stageId}`, 'FAILED_FETCHING_STAGE', error);
       }
     };
@@ -667,10 +716,13 @@ export class Worker<
       });
 
       if (error) {
-        this.logger.error('Failed to update task user metadata', {
-          taskId,
-          error: getErrorMessageFromUnknown(error),
-        });
+        this.logger.error(
+          {
+            taskId,
+            error: getErrorMessageFromUnknown(error),
+          },
+          'Failed to update task user metadata'
+        );
         throw new WorkerError(`Failed to update task user metadata for task ID ${taskId}`, 'FAILED_FETCHING_STAGE', error);
       }
     };

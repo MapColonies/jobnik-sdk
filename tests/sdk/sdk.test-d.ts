@@ -126,8 +126,9 @@ describe('JobnikSDK.createWorker', () => {
       baseUrl: 'http://localhost:8080',
     });
 
-    const taskHandler: TaskHandler<{ userMetadata: Record<string, unknown>; data: Record<string, unknown> }> = async () => {};
-    const worker = sdk.createWorker(taskHandler, 'any-stage');
+    const taskHandler: TaskHandler = async () => {};
+
+    const worker = sdk.createWorker('any-stage', taskHandler);
 
     expectTypeOf(worker).toExtend<IWorker>();
   });
@@ -137,9 +138,9 @@ describe('JobnikSDK.createWorker', () => {
       baseUrl: 'http://localhost:8080',
     });
 
-    const taskHandler: TaskHandler<TestStageTypes['image-resize']['task'], TestJobTypes, TestStageTypes> = async () => {};
+    const taskHandler: TaskHandler<TestJobTypes, TestStageTypes> = async () => {};
 
-    const worker = sdk.createWorker(taskHandler, 'image-resize');
+    const worker = sdk.createWorker('image-resize', taskHandler);
     expectTypeOf(worker).toExtend<IWorker>();
   });
 
@@ -148,9 +149,9 @@ describe('JobnikSDK.createWorker', () => {
       baseUrl: 'http://localhost:8080',
     });
 
-    const taskHandler: TaskHandler<TestStageTypes['image-resize']['task'], TestJobTypes, TestStageTypes> = async () => {};
+    const taskHandler: TaskHandler<TestJobTypes, TestStageTypes> = async () => {};
 
-    const worker = sdk.createWorker(taskHandler, 'image-resize', {
+    const worker = sdk.createWorker('image-resize', taskHandler, {
       concurrency: 5,
       pullingInterval: 2000,
       taskHandlerCircuitBreaker: {

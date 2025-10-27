@@ -9,6 +9,12 @@ const packageJson = readPackageJsonSync();
 const SDK_INSTRUMENTATION_SCOPE = packageJson.name ?? 'unknown-sdk';
 const SDK_VERSION = packageJson.version ?? 'unknown-version';
 
+export const DEFAULT_SPAN_CONTEXT: SpanContext = {
+  traceId: '00000000000000000000000000000000',
+  spanId: '0000000000000000',
+  traceFlags: 0,
+};
+
 export const BASE_ATTRIBUTES = {
   [ATTR_MESSAGING_SYSTEM]: 'jobnik',
   [ATTR_MESSAGING_CLIENT_ID]: hostname(),

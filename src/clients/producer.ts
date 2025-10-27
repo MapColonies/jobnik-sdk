@@ -6,7 +6,7 @@ import type { Job, JobData, JobTypesTemplate, NewJob, ValidJobType } from '../ty
 import type { InferStageData, NewStage, Stage, StageData, StageTypesTemplate, ValidStageType } from '../types/stage';
 import type { InferTaskData, NewTask, Task } from '../types/task';
 import type { IProducer } from '../types/producer';
-import { tracer, withSpan } from '../telemetry/trace';
+import { DEFAULT_SPAN_CONTEXT, tracer, withSpan } from '../telemetry/trace';
 import {
   ATTR_JOB_MANAGER_JOB_NAME,
   ATTR_JOB_MANAGER_JOB_PRIORITY,
@@ -88,11 +88,14 @@ export class Producer<
   public async createJob<JobType extends ValidJobType<JobTypes> = ''>(jobData: NewJob<JobTypes, JobType>): Promise<Job<JobTypes, JobType>> {
     const startTime = performance.now();
 
-    this.logger.debug('Starting job creation', {
-      operation: 'createJob',
-      jobName: jobData.name,
-      priority: jobData.priority ?? DEFAULT_PRIORITY,
-    });
+    this.logger.debug(
+      {
+        operation: 'createJob',
+        jobName: jobData.name,
+        priority: jobData.priority ?? DEFAULT_PRIORITY,
+      },
+      'Starting job creation'
+    );
 
     return withSpan(
       `create_job ${jobData.name}`,
@@ -121,16 +124,19 @@ export class Producer<
 
         const duration = performance.now() - startTime;
 
-        this.logger.info('Job created successfully', {
-          operation: 'createJob',
-          duration,
-          status: 'success',
-          metadata: {
-            jobId: data.id,
-            jobName: jobData.name,
-            priority: jobData.priority ?? 'MEDIUM',
+        this.logger.info(
+          {
+            operation: 'createJob',
+            duration,
+            status: 'success',
+            metadata: {
+              jobId: data.id,
+              jobName: jobData.name,
+              priority: jobData.priority ?? 'MEDIUM',
+            },
           },
-        });
+          'Job created successfully'
+        );
 
         span.setAttribute(ATTR_MESSAGING_MESSAGE_CONVERSATION_ID, data.id);
         return data;
@@ -163,11 +169,14 @@ export class Producer<
   ): Promise<Stage<StageType, InferStageData<StageType, StageTypes>>> {
     const startTime = performance.now();
 
-    this.logger.debug('Starting stage creation', {
-      operation: 'createStage',
-      jobId,
-      stageType: stageData.type,
-    });
+    this.logger.debug(
+      {
+        operation: 'createStage',
+        jobId,
+        stageType: stageData.type,
+      },
+      'Starting stage creation'
+    );
 
     return withSpan(
       `add_stage ${stageData.type}`,
@@ -191,7 +200,7 @@ export class Producer<
         }
 
         const remoteContext = propagation.extract(context.active(), jobResponse.data);
-        const jobSpanContext = trace.getSpanContext(remoteContext);
+        const jobSpanContext = trace.getSpanContext(remoteContext) ?? DEFAULT_SPAN_CONTEXT;
 
         if (!jobSpanContext) {
           throw new ProducerError(`Failed to extract span context for job ${jobId}`, JOBNIK_SDK_ERROR_CODES.TRACE_CONTEXT_EXTRACT_ERROR);
@@ -218,16 +227,19 @@ export class Producer<
 
         const duration = performance.now() - startTime;
 
-        this.logger.info('Stage created successfully', {
-          operation: 'createStage',
-          duration,
-          status: 'success',
-          metadata: {
-            jobId,
-            stageId: data.id,
-            stageType: stageData.type,
+        this.logger.info(
+          {
+            operation: 'createStage',
+            duration,
+            status: 'success',
+            metadata: {
+              jobId,
+              stageId: data.id,
+              stageType: stageData.type,
+            },
           },
-        });
+          'Stage created successfully'
+        );
 
         span.setAttribute(ATTR_JOB_MANAGER_STAGE_ID, data.id);
         return data as Stage<StageType, InferStageData<StageType, StageTypes>>;
@@ -271,12 +283,15 @@ export class Producer<
 
     const startTime = performance.now();
 
-    this.logger.debug('Starting task creation', {
-      operation: 'createTasks',
-      stageId,
-      stageType,
-      taskCount: taskData.length,
-    });
+    this.logger.debug(
+      {
+        operation: 'createTasks',
+        stageId,
+        stageType,
+        taskCount: taskData.length,
+      },
+      'Starting task creation'
+    );
 
     return withSpan(
       `send ${stageType}`,
@@ -302,12 +317,15 @@ export class Producer<
         }
 
         if (stageResponse.data.type !== stageType) {
-          this.logger.debug('Stage type validation failed - mismatch detected', {
-            operation: 'createTasks',
-            stageId,
-            clientSpecified: stageType,
-            serverReported: stageResponse.data.type,
-          });
+          this.logger.debug(
+            {
+              operation: 'createTasks',
+              stageId,
+              clientSpecified: stageType,
+              serverReported: stageResponse.data.type,
+            },
+            'Stage type validation failed - mismatch detected'
+          );
 
           throw new ProducerError(
             `Stage type mismatch for stage ${stageId}: server reports '${stageResponse.data.type}', but client specified '${stageType}'`,
@@ -316,7 +334,7 @@ export class Producer<
         }
 
         const remoteContext = propagation.extract(context.active(), stageResponse.data);
-        const stageSpanContext = trace.getSpanContext(remoteContext);
+        const stageSpanContext = trace.getSpanContext(remoteContext) ?? DEFAULT_SPAN_CONTEXT;
         if (!stageSpanContext) {
           throw new ProducerError(`Failed to extract span context for stage ${stageId}`, JOBNIK_SDK_ERROR_CODES.TRACE_CONTEXT_EXTRACT_ERROR);
         }
@@ -352,17 +370,20 @@ export class Producer<
 
           const duration = performance.now() - startTime;
 
-          this.logger.info('Tasks created successfully', {
-            operation: 'createTasks',
-            duration,
-            status: 'success',
-            metadata: {
-              stageId,
-              stageType,
-              taskCount: taskData.length,
-              createdTaskCount: data.length,
+          this.logger.info(
+            {
+              operation: 'createTasks',
+              duration,
+              status: 'success',
+              metadata: {
+                stageId,
+                stageType,
+                taskCount: taskData.length,
+                createdTaskCount: data.length,
+              },
             },
-          });
+            'Tasks created successfully'
+          );
 
           return data as Task<InferTaskData<StageType, StageTypes>>[];
         } catch (error) {

@@ -68,6 +68,11 @@ export class JobnikSDK<
   StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>,
 > implements IJobnikSDK<JobTypes, StageTypes>
 {
+  declare public readonly _: {
+    readonly jobTypes: JobTypes;
+    readonly stageTypes: StageTypes;
+  };
+
   private readonly logger: Logger;
   private readonly apiClient: ApiClient;
   private readonly producer: Producer;
@@ -153,8 +158,8 @@ export class JobnikSDK<
    * Workers automatically dequeue tasks, execute the handler function, and update task status.
    *
    * @template StageType - The stage type this worker will process, must be a key from StageTypes
-   * @param taskHandler - Async function to process individual tasks
    * @param stageType - Stage type name that this worker will process
+   * @param taskHandler - Async function to process individual tasks
    * @param options - Optional worker configuration for concurrency, polling intervals, and circuit breakers
    * @returns Worker instance ready to start processing tasks
    *
@@ -200,9 +205,10 @@ export class JobnikSDK<
    * );
    * ```
    */
-  public createWorker<StageType extends ValidStageType<StageTypes> = string, JobType extends ValidJobType<JobTypes> = string>(
-    taskHandler: TaskHandler<JobTypes, StageTypes, JobType, StageType>,
+  public createWorker<JobType extends ValidJobType<JobTypes> = string, StageType extends ValidStageType<StageTypes> = string>(
+    // public createWorker<JobType extends Extract<keyof JobTypes, string>, StageType extends Extract<keyof StageTypes, string>>(
     stageType: StageType,
+    taskHandler: TaskHandler<JobTypes, StageTypes, JobType, StageType>,
     options?: WorkerOptions
   ): IWorker {
     return new Worker<JobTypes, StageTypes, JobType, StageType>(taskHandler, stageType, options ?? {}, this.logger, this.apiClient, this.producer);

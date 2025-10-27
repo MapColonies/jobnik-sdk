@@ -3,7 +3,6 @@ import { IConsumer } from './consumer';
 import { JobData, JobTypesTemplate, ValidJobType } from './job';
 import { IProducer } from './producer';
 import { StageData, StageTypesTemplate, ValidStageType } from './stage';
-import { InferTaskData } from './task';
 import { IWorker, TaskHandler, WorkerOptions } from './worker';
 
 /**
@@ -81,9 +80,19 @@ export interface IJobnikSDK<
    * );
    * ```
    */
-  createWorker: <StageType extends ValidStageType<StageTypes> = string, JobType extends ValidJobType<JobTypes> = string>(
-    taskHandler: TaskHandler<JobTypes, StageTypes, JobType, StageType>,
+  createWorker: <JobType extends ValidJobType<JobTypes> = string, StageType extends ValidStageType<StageTypes> = string>(
+    // createWorker: <JobType extends Extract<keyof JobTypes, string>, StageType extends Extract<keyof StageTypes, string>>(
     stageType: StageType,
+    taskHandler: TaskHandler<JobTypes, StageTypes, JobType, StageType>,
     options?: WorkerOptions
   ) => IWorker;
+
+  /**
+   * @internal
+   * This property is used for type inference and should not be accessed directly.
+   */
+  readonly _: {
+    readonly jobTypes: JobTypes;
+    readonly stageTypes: StageTypes;
+  };
 }
