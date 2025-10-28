@@ -202,10 +202,6 @@ export class Producer<
         const remoteContext = propagation.extract(context.active(), jobResponse.data);
         const jobSpanContext = trace.getSpanContext(remoteContext) ?? DEFAULT_SPAN_CONTEXT;
 
-        if (!jobSpanContext) {
-          throw new ProducerError(`Failed to extract span context for job ${jobId}`, JOBNIK_SDK_ERROR_CODES.TRACE_CONTEXT_EXTRACT_ERROR);
-        }
-
         span.addLink({
           context: jobSpanContext,
         });
@@ -335,9 +331,7 @@ export class Producer<
 
         const remoteContext = propagation.extract(context.active(), stageResponse.data);
         const stageSpanContext = trace.getSpanContext(remoteContext) ?? DEFAULT_SPAN_CONTEXT;
-        if (!stageSpanContext) {
-          throw new ProducerError(`Failed to extract span context for stage ${stageId}`, JOBNIK_SDK_ERROR_CODES.TRACE_CONTEXT_EXTRACT_ERROR);
-        }
+
         span.addLink({
           context: stageSpanContext,
         });

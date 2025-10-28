@@ -227,10 +227,6 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
         const remoteContext = propagation.extract(context.active(), task);
         const taskSpanContext = trace.getSpanContext(remoteContext) ?? DEFAULT_SPAN_CONTEXT;
 
-        if (!taskSpanContext) {
-          throw new ConsumerError(`Failed to extract span context for task ${task.id}`, JOBNIK_SDK_ERROR_CODES.TRACE_CONTEXT_EXTRACT_ERROR);
-        }
-
         // Validate task is in correct state for update
         if (task.status !== 'IN_PROGRESS') {
           throw new ConsumerError(
