@@ -4,6 +4,7 @@ import type { Logger } from '../types';
 import type { StageData, StageTypesTemplate } from '../types/stage';
 import type { WorkerEvents } from '../types/worker';
 import { Consumer } from './consumer';
+import type { JobnikMetrics } from '../telemetry/metrics';
 
 /**
  * Abstract base class for worker implementations with event handling capabilities.
@@ -36,9 +37,14 @@ export abstract class BaseWorker<StageTypes extends StageTypesTemplate<StageType
    *
    * @param apiClient - HTTP client for API communication
    * @param logger - Logger instance for operation tracking
+   * @param metrics - Metrics instance for Prometheus metrics collection
    */
-  public constructor(apiClient: ApiClient, logger: Logger) {
-    super(apiClient, logger);
+  public constructor(
+    apiClient: ApiClient,
+    logger: Logger,
+    protected override readonly metrics: JobnikMetrics
+  ) {
+    super(apiClient, logger, metrics);
   }
 
   /**

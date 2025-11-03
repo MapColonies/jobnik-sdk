@@ -12,6 +12,7 @@ import type { Task } from '../../src/types/task';
 import type { Logger } from '../../src/types';
 import type { TaskHandler, WorkerOptions } from '../../src/types/worker';
 import { Producer } from '../../src/clients';
+import { createTestMetrics } from '../utils/metrics';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
@@ -83,7 +84,15 @@ describe('Worker', () => {
       pullingInterval: 500,
     };
 
-    worker = new Worker(taskHandler, stageType, workerOptions, logger, apiClient, new Producer(apiClient, logger));
+    worker = new Worker(
+      taskHandler,
+      stageType,
+      workerOptions,
+      logger,
+      apiClient,
+      new Producer(apiClient, logger, createTestMetrics()),
+      createTestMetrics()
+    );
   });
 
   afterEach(async () => {
@@ -521,7 +530,8 @@ describe('Worker', () => {
           },
           logger,
           apiClient,
-          new Producer(apiClient, logger)
+          new Producer(apiClient, logger, createTestMetrics()),
+          createTestMetrics()
         );
 
         expect(customWorker).toBeDefined();

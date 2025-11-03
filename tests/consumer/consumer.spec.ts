@@ -8,6 +8,7 @@ import { NoopLogger } from '../../src/telemetry/noopLogger';
 import type { StageId, TaskId } from '../../src/types/brands';
 import { ConsumerError, API_ERROR_CODES } from '../../src/errors';
 import type { Task } from '../../src/types/task';
+import { createTestMetrics } from '../utils/metrics';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
@@ -96,7 +97,8 @@ describe('Consumer', () => {
     });
 
     logger = new NoopLogger();
-    consumer = new Consumer(apiClient, logger);
+    const metrics = createTestMetrics();
+    consumer = new Consumer(apiClient, logger, metrics);
   });
 
   afterEach(() => {
@@ -153,7 +155,7 @@ describe('Consumer', () => {
       });
 
       it('should dequeue typed tasks with custom generics', async () => {
-        const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger);
+        const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger, createTestMetrics());
 
         const mockTaskResponse = createMockTaskResponse({
           id: 'task-typed-123' as TaskId,
@@ -550,7 +552,7 @@ describe('Consumer', () => {
 
   describe('integration scenarios', () => {
     it('should handle a complete task processing workflow: dequeue -> complete', async () => {
-      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger);
+      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger, createTestMetrics());
       const stageType = 'image-resize';
 
       // Step 1: Dequeue Task
@@ -615,7 +617,7 @@ describe('Consumer', () => {
     });
 
     it('should handle a complete task processing workflow: dequeue -> fail', async () => {
-      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger);
+      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger, createTestMetrics());
       const stageType = 'data-transform';
 
       // Step 1: Dequeue Task
@@ -704,7 +706,7 @@ describe('Consumer', () => {
     });
 
     it('should handle typed consumer with type safety', async () => {
-      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger);
+      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger, createTestMetrics());
 
       const mockImageTask = createMockTaskResponse({
         id: 'task-typed-image' as TaskId,

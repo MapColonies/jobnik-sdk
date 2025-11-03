@@ -7,6 +7,7 @@ import { Producer } from '../../src/clients/producer';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
 import { JobId, StageId } from '../../src/types/brands';
 import { ProducerError, API_ERROR_CODES } from '../../src/errors';
+import { createTestMetrics } from '../utils/metrics';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
@@ -84,7 +85,8 @@ describe('Producer', () => {
     });
 
     logger = new NoopLogger();
-    producer = new Producer(apiClient, logger);
+    const metrics = createTestMetrics();
+    producer = new Producer(apiClient, logger, metrics);
   });
 
   afterEach(() => {
@@ -407,7 +409,7 @@ describe('Producer', () => {
       });
 
       it('should create typed tasks with custom generics', async () => {
-        const typedProducer = new Producer<TestJobTypes, TestStageTypes>(apiClient, logger);
+        const typedProducer = new Producer<TestJobTypes, TestStageTypes>(apiClient, logger, createTestMetrics());
 
         const taskData = [
           {
@@ -575,7 +577,7 @@ describe('Producer', () => {
 
   describe('integration scenarios', () => {
     it('should handle a complete workflow: job -> stage -> tasks', async () => {
-      const typedProducer = new Producer<TestJobTypes, TestStageTypes>(apiClient, logger);
+      const typedProducer = new Producer<TestJobTypes, TestStageTypes>(apiClient, logger, createTestMetrics());
 
       // Step 1: Create Job
       const jobData = {

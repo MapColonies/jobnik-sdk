@@ -19,6 +19,8 @@ import type { IProducer } from '../types/producer';
 import { WorkerError } from '../errors/sdkErrors';
 import type { JobId, StageId, TaskId } from '../types/brands';
 import { BaseWorker } from './base-worker';
+import type { JobnikMetrics } from '../telemetry/metrics';
+import { categorizeError } from '../telemetry/metrics-utils';
 
 /** Default polling interval in milliseconds for task dequeue operations */
 const DEFAULT_POLLING_INTERVAL = 10000;
@@ -144,6 +146,10 @@ export class Worker<
   /** Counter for consecutive empty polling attempts (for backoff strategies) */
   private consecutiveEmptyPolls: number = 0;
 
+  // metrics members
+  /** Start time for uptime calculation */
+  private readonly startTime: number;
+
   /**
    * Creates a new Worker instance with the specified configuration.
    *
@@ -155,6 +161,8 @@ export class Worker<
    * @param options - Worker configuration options
    * @param logger - Logger instance for operation tracking
    * @param apiClient - HTTP client for API communication
+   * @param producer - Producer instance for creating follow-up tasks
+   * @param metrics - Metrics instance for Prometheus metrics collection
    *
    * @example
    * ```typescript
@@ -166,7 +174,9 @@ export class Worker<
    *   'image-resize',
    *   { concurrency: 3, pullingInterval: 5000 },
    *   logger,
-   *   apiClient
+   *   apiClient,
+   *   producer,
+   *   metrics
    * );
    * ```
    */
@@ -176,9 +186,15 @@ export class Worker<
     private readonly options: WorkerOptions,
     logger: Logger,
     apiClient: ApiClient,
-    private readonly producer: IProducer<JobTypes, StageTypes>
+    private readonly producer: IProducer<JobTypes, StageTypes>,
+    protected override readonly metrics: JobnikMetrics
   ) {
-    super(apiClient, logger);
+    super(apiClient, logger, metrics);
+    this.startTime = Date.now();
+
+    // Initialize worker-specific metrics for this stage type
+    this.metrics.initializeWorkerMetrics(stageType);
+
     this.taskHandlerCircuitBreaker = new circuitBreaker(this.taskHandler, {
       ...defaultCircuitBreakerOptions,
       ...options.taskHandlerCircuitBreaker,
@@ -196,6 +212,9 @@ export class Worker<
     });
 
     this.setupDequeueCircuitBreaker();
+
+    // Set up uptime metric collection using prom-client's collect callback
+    this.metrics.setupWorkerUptimeCollection(stageType, this.startTime);
   }
 
   /**
@@ -313,6 +332,8 @@ export class Worker<
     );
 
     this.isRunning = false;
+
+    // No need to clean up uptime metric - collect callback handles it automatically
     await super.stop();
     this.abortController.abort('shutdown called');
 
@@ -342,8 +363,15 @@ export class Worker<
 
     this.emit('taskStarted', { taskId: task.id, stageType: this.stageType });
 
+    // Increment active tasks BEFORE starting work (prevent race condition)
+    this.metrics.workerTasksActive.labels(this.stageType).inc();
+
     const wrapHandler = async (): Promise<void> => {
       const ctx = trace.setSpan(context.active(), span);
+
+      // Use prom-client's startTimer helper instead of manual timing
+      const endTimer = this.metrics.workerTaskDuration.startTimer();
+
       await context.with(ctx, async () => {
         try {
           const taskParents = await this.fetchTaskParents(task);
@@ -368,17 +396,26 @@ export class Worker<
             'Task handler firing'
           );
 
-          const startTime = performance.now();
-
           await this.taskHandlerCircuitBreaker.fire(task, taskContext as unknown as TaskHandlerContext<JobTypes, StageTypes, JobType, StageType>);
           this.logger.debug({ taskId: task.id, stageType: this.stageType }, 'Task handler succeeded');
-          await this.markTask('COMPLETED', { task, taskId: undefined });
 
-          this.emit('taskCompleted', { taskId: task.id, stageType: this.stageType, duration: performance.now() - startTime });
+          // Use startTimer's returned function to record duration with labels
+          const duration = endTimer({ stage_type: this.stageType, status: 'completed' });
+          this.metrics.workerTasksCompletedTotal.labels(this.stageType).inc();
+
+          await this.markTask('COMPLETED', { task, taskId: undefined }, this.stageType);
+
+          // Note: duration is in seconds from startTimer
+          this.emit('taskCompleted', { taskId: task.id, stageType: this.stageType, duration: duration * 1000 });
 
           span.setStatus({ code: SpanStatusCode.OK });
           span.end();
         } catch (error) {
+          const duration = endTimer({ stage_type: this.stageType, status: 'failed' });
+          const errorType = categorizeError(error);
+
+          this.metrics.workerTasksFailedTotal.labels(this.stageType, errorType).inc();
+
           this.logger.warn(
             {
               taskId: task.id,
@@ -388,7 +425,7 @@ export class Worker<
             'Task handler failed'
           );
 
-          const [err] = await presult(this.markTask('FAILED', { task, taskId: undefined }));
+          const [err] = await presult(this.markTask('FAILED', { task, taskId: undefined }, this.stageType));
 
           if (err) {
             this.logger.error(
@@ -438,6 +475,9 @@ export class Worker<
         });
       })
       .finally(() => {
+        // Decrement active tasks AFTER work is done (in finally block)
+        this.metrics.workerTasksActive.labels(this.stageType).dec();
+
         this.logger.debug(
           {
             taskId: task.id,
@@ -518,6 +558,7 @@ export class Worker<
 
       if (task) {
         this.consecutiveEmptyPolls = 0;
+        this.metrics.workerConsecutiveEmptyPolls.labels(this.stageType).set(0);
 
         this.logger.debug(
           {
@@ -550,6 +591,7 @@ export class Worker<
           'No tasks available in queue'
         );
         this.consecutiveEmptyPolls++;
+        this.metrics.workerConsecutiveEmptyPolls.labels(this.stageType).set(this.consecutiveEmptyPolls);
 
         this.emit('queueEmpty', {
           stageType: this.stageType,
@@ -593,6 +635,9 @@ export class Worker<
     this.dequeueTaskCircuitBreaker.on('open', () => {
       this.logger.warn({ stageType: this.stageType }, 'Dequeue task circuit breaker opened');
 
+      this.metrics.workerCircuitBreakerState.labels(this.stageType, 'dequeue_task').set(2); // 2 = open
+      this.metrics.workerCircuitBreakerOpensTotal.labels(this.stageType, 'dequeue_task').inc();
+
       this.emit('circuitBreakerOpened', {
         breaker: 'dequeueTask',
         stageType: this.stageType,
@@ -602,6 +647,8 @@ export class Worker<
     this.dequeueTaskCircuitBreaker.on('close', () => {
       this.logger.info({ stageType: this.stageType }, 'Dequeue task circuit breaker closed');
 
+      this.metrics.workerCircuitBreakerState.labels(this.stageType, 'dequeue_task').set(0); // 0 = closed
+
       this.emit('circuitBreakerClosed', {
         breaker: 'dequeueTask',
         stageType: this.stageType,
@@ -610,6 +657,8 @@ export class Worker<
 
     this.dequeueTaskCircuitBreaker.on('halfOpen', () => {
       this.logger.info({ stageType: this.stageType }, 'Dequeue task circuit breaker half-opened');
+
+      this.metrics.workerCircuitBreakerState.labels(this.stageType, 'dequeue_task').set(1); // 1 = half_open
     });
   }
 
@@ -626,6 +675,9 @@ export class Worker<
     this.taskHandlerCircuitBreaker.on('open', () => {
       this.logger.warn({ stageType: this.stageType }, 'Task handler circuit breaker opened');
 
+      this.metrics.workerCircuitBreakerState.labels(this.stageType, 'task_handler').set(2); // 2 = open
+      this.metrics.workerCircuitBreakerOpensTotal.labels(this.stageType, 'task_handler').inc();
+
       this.emit('circuitBreakerOpened', {
         breaker: 'taskHandler',
         stageType: this.stageType,
@@ -639,6 +691,8 @@ export class Worker<
     this.taskHandlerCircuitBreaker.on('close', () => {
       this.logger.info({ stageType: this.stageType }, 'Task handler circuit breaker closed');
 
+      this.metrics.workerCircuitBreakerState.labels(this.stageType, 'task_handler').set(0); // 0 = closed
+
       this.emit('circuitBreakerClosed', {
         breaker: 'taskHandler',
         stageType: this.stageType,
@@ -649,6 +703,9 @@ export class Worker<
 
     this.taskHandlerCircuitBreaker.on('halfOpen', () => {
       this.logger.info({ stageType: this.stageType }, 'Task handler circuit breaker half-opened');
+
+      this.metrics.workerCircuitBreakerState.labels(this.stageType, 'task_handler').set(1); // 1 = half_open
+
       this.resolveTaskCircuitBreaker();
     });
   }
