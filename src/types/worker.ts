@@ -8,6 +8,7 @@ import type { IProducer } from './producer';
 import type { InferJobData, Job, JobData, JobTypesTemplate, ValidJobType } from './job';
 import type { Prettify } from './utils';
 import { IJobnikSDK } from './sdk';
+import { BackoffOptions } from './backoff';
 
 /**
  * Configuration options for circuit breaker behavior.
@@ -22,10 +23,14 @@ export type CircuitBreakerOptions = Pick<OpossumOptions, 'enabled' | 'rollingCou
  * ```typescript
  * const options: WorkerOptions = {
  *   concurrency: 5,
- *   pullingInterval: 5000,
  *   taskHandlerCircuitBreaker: {
  *     enabled: true,
  *     errorThresholdPercentage: 50
+ *   },
+ *   backoffOptions: {
+ *     initialBaseRetryDelayMs: 1000,
+ *     maxDelayMs: 30000,
+ *     backoffFactor: 2,
  *   }
  * };
  * ```
@@ -33,12 +38,12 @@ export type CircuitBreakerOptions = Pick<OpossumOptions, 'enabled' | 'rollingCou
 export interface WorkerOptions {
   /** Maximum number of tasks to process concurrently. @defaultValue 1 */
   concurrency?: number;
-  /** Interval in milliseconds between task dequeue attempts. @defaultValue 10000 */
-  pullingInterval?: number;
   /** Circuit breaker configuration for task handler execution */
   taskHandlerCircuitBreaker?: CircuitBreakerOptions;
   /** Circuit breaker configuration for task dequeue operations */
   dequeueTaskCircuitBreaker?: CircuitBreakerOptions;
+  /** Options for exponential backoff during task dequeue retries */
+  backoffOptions: BackoffOptions;
 }
 
 /**

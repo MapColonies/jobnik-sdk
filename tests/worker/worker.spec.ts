@@ -83,7 +83,7 @@ describe('Worker', () => {
     const workerOptions: WorkerOptions = {
       concurrency: 1,
       taskHandlerCircuitBreaker: { enabled: true },
-      pullingInterval: 500,
+      backoffOptions: { backoffFactor: 2, initialBaseRetryDelayMs: 1000, maxDelayMs: 60000 },
     };
 
     worker = new Worker(taskHandler, stageType, workerOptions, logger, apiClient, new Producer(apiClient, logger, metrics), metrics);

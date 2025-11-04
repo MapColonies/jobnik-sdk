@@ -168,10 +168,14 @@ describe('JobnikSDK.createWorker', () => {
 
     const worker = sdk.createWorker('image-resize', taskHandler, {
       concurrency: 5,
-      pullingInterval: 2000,
       taskHandlerCircuitBreaker: {
         enabled: true,
         errorThresholdPercentage: 50,
+      },
+      backoffOptions: {
+        initialBaseRetryDelayMs: 1000,
+        maxDelayMs: 60000,
+        backoffFactor: 2,
       },
     });
 
