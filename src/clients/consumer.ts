@@ -3,11 +3,12 @@ import { StatusCodes } from 'http-status-codes';
 import type { ApiClient } from '../api';
 import type { TaskId } from '../types/brands';
 import type { InferTaskData, Task } from '../types/task';
-import type { ValidStageType, StageData } from '../types/stage';
+import type { ValidStageType, StageTypesTemplate } from '../types/stage';
 import type { components } from '../types/openapi';
-import { withSpan } from '../telemetry/trace';
+import { DEFAULT_SPAN_CONTEXT, withSpan } from '../telemetry/trace';
 import { JOB_MANAGER_TASK_ATTEMPTS, JOB_MANAGER_TASK_STATUS, ATTR_MESSAGING_DESTINATION_NAME, ATTR_MESSAGING_MESSAGE_ID } from '../telemetry/semconv';
 import type { Logger } from '../types';
+import type { IConsumer } from '../types/consumer';
 import { createAPIErrorFromResponse } from '../errors/utils';
 import { JOBNIK_SDK_ERROR_CODES, ConsumerError } from '../errors';
 
@@ -34,7 +35,7 @@ import { JOBNIK_SDK_ERROR_CODES, ConsumerError } from '../errors';
  * ```
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } = {}> {
+export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> implements IConsumer<StageTypes> {
   /**
    * Creates a new Consumer instance.
    *
@@ -72,10 +73,13 @@ export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } 
   ): Promise<Task<InferTaskData<StageType, StageTypes>> | null> {
     const startTime = performance.now();
 
-    this.logger.debug('Starting task dequeue', {
-      operation: 'dequeueTask',
-      stageType,
-    });
+    this.logger.debug(
+      {
+        operation: 'dequeueTask',
+        stageType,
+      },
+      'Starting task dequeue'
+    );
 
     return withSpan(
       `receive ${stageType}`,
@@ -94,11 +98,14 @@ export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } 
         // Handle 404 as expected behavior when no tasks are available
         if (response.status === (StatusCodes.NOT_FOUND as number)) {
           const duration = performance.now() - startTime;
-          this.logger.debug('No tasks available for dequeue', {
-            operation: 'dequeueTask',
-            duration,
-            stageType,
-          });
+          this.logger.debug(
+            {
+              operation: 'dequeueTask',
+              duration,
+              stageType,
+            },
+            'No tasks available for dequeue'
+          );
           return null;
         }
 
@@ -112,16 +119,19 @@ export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } 
 
         const duration = performance.now() - startTime;
 
-        this.logger.info('Task dequeued successfully', {
-          operation: 'dequeueTask',
-          duration,
-          status: 'success',
-          metadata: {
-            taskId: data.id,
-            stageType,
-            attempts: data.attempts,
+        this.logger.info(
+          {
+            operation: 'dequeueTask',
+            duration,
+            status: 'success',
+            metadata: {
+              taskId: data.id,
+              stageType,
+              attempts: data.attempts,
+            },
           },
-        });
+          'Task dequeued successfully'
+        );
 
         span.setAttributes({
           [ATTR_MESSAGING_MESSAGE_ID]: data.id,
@@ -193,9 +203,12 @@ export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } 
   ): Promise<void> {
     const startTime = performance.now();
 
-    this.logger.debug(`Marking task as ${status}`, {
-      taskId: options.taskId ?? options.task.id,
-    });
+    this.logger.debug(
+      {
+        taskId: options.taskId ?? options.task.id,
+      },
+      `Marking task as ${status}`
+    );
 
     return withSpan(
       'update_status',
@@ -212,11 +225,7 @@ export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } 
 
         // Extract trace context and link to original create span
         const remoteContext = propagation.extract(context.active(), task);
-        const taskSpanContext = trace.getSpanContext(remoteContext);
-
-        if (!taskSpanContext) {
-          throw new ConsumerError(`Failed to extract span context for task ${task.id}`, JOBNIK_SDK_ERROR_CODES.TRACE_CONTEXT_EXTRACT_ERROR);
-        }
+        const taskSpanContext = trace.getSpanContext(remoteContext) ?? DEFAULT_SPAN_CONTEXT;
 
         // Validate task is in correct state for update
         if (task.status !== 'IN_PROGRESS') {
@@ -245,13 +254,16 @@ export class Consumer<StageTypes extends { [K in keyof StageTypes]: StageData } 
 
         const duration = performance.now() - startTime;
 
-        this.logger.info(`Task marked as ${status}`, {
-          duration,
-          status: 'success',
-          metadata: {
-            taskId: task.id,
+        this.logger.info(
+          {
+            duration,
+            status: 'success',
+            metadata: {
+              taskId: task.id,
+            },
           },
-        });
+          `Task marked as ${status}`
+        );
       }
     );
   }

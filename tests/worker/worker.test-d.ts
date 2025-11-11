@@ -4,6 +4,7 @@ import type { ApiClient } from '../../src/api';
 import type { TaskId } from '../../src/types/brands';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
 import type { TaskHandler, WorkerOptions } from '../../src/types/worker';
+import { IProducer } from '../../src/types/producer';
 
 // Test stage types for type checking
 interface TestStageTypes {
@@ -28,6 +29,7 @@ interface TestStageTypes {
 declare const apiClient: ApiClient;
 declare const logger: NoopLogger;
 declare const options: WorkerOptions;
+declare const producer: IProducer;
 
 describe('Worker type generics', () => {
   it('enforces correct task handler signature for specific stage', () => {
@@ -40,7 +42,7 @@ describe('Worker type generics', () => {
       await Promise.resolve();
     };
 
-    new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient);
+    new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer);
   });
 
   it('provides correct context types in task handler', () => {
@@ -50,7 +52,7 @@ describe('Worker type generics', () => {
       await Promise.resolve();
     };
 
-    new Worker<TestStageTypes, 'baz'>(taskHandler, 'baz', options, logger, apiClient);
+    new Worker<TestStageTypes, 'baz'>(taskHandler, 'baz', options, logger, apiClient, producer);
   });
 
   it('allows construction without explicit generics', () => {
@@ -60,7 +62,7 @@ describe('Worker type generics', () => {
       await Promise.resolve();
     };
 
-    new Worker(taskHandler, 'any-stage', options, logger, apiClient);
+    new Worker(taskHandler, 'any-stage', options, logger, apiClient, producer);
   });
 });
 
@@ -69,7 +71,7 @@ describe('Worker method types', () => {
     const taskHandler: TaskHandler<{ userMetadata: { e: string }; data: { f: number } }> = async () => {
       // Empty implementation for type test
     };
-    const worker = new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient);
+    const worker = new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer);
 
     expectTypeOf(worker.start()).toEqualTypeOf<Promise<void>>();
     expectTypeOf(worker.stop()).toEqualTypeOf<Promise<void>>();
@@ -81,7 +83,7 @@ describe('Worker event emitter types', () => {
     const taskHandler: TaskHandler<{ userMetadata: { e: string }; data: { f: number } }> = async () => {
       await Promise.resolve();
     };
-    const worker = new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient);
+    const worker = new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer);
 
     // Test event listener types
     worker.on('started', (data) => {
@@ -129,7 +131,7 @@ describe('Worker event emitter types', () => {
     const taskHandler: TaskHandler<{ userMetadata: { e: string }; data: { f: number } }> = async () => {
       await Promise.resolve();
     };
-    const worker = new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient);
+    const worker = new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer);
 
     const listener = (): void => {};
 
@@ -150,7 +152,7 @@ describe('TaskHandler without explicit types', () => {
     };
 
     // This should work without TypeScript errors
-    new Worker(taskHandler, 'any-stage', options, logger, apiClient);
+    new Worker(taskHandler, 'any-stage', options, logger, apiClient, producer);
   });
 
   it('works with minimal task handler signature', () => {
@@ -159,6 +161,6 @@ describe('TaskHandler without explicit types', () => {
       await Promise.resolve();
     };
 
-    new Worker(taskHandler, 'simple-stage', options, logger, apiClient);
+    new Worker(taskHandler, 'simple-stage', options, logger, apiClient, producer);
   });
 });

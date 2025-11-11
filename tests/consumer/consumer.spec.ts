@@ -299,32 +299,6 @@ describe('Consumer', () => {
         await expect(response).rejects.toThrow(`Cannot mark task ${taskId} as COMPLETED: task is in COMPLETED state, expected IN_PROGRESS state`);
       });
 
-      it('should throw ConsumerError when span context extraction fails', async () => {
-        vi.spyOn(trace, 'getSpanContext').mockReturnValue(undefined);
-
-        // Mock GET /tasks/{taskId} without trace context
-        const mockTaskResponse = createMockTaskResponse({
-          id: taskId,
-          // Remove trace context to trigger the error
-          traceparent: undefined,
-          tracestate: undefined,
-        });
-
-        mockPool
-          .intercept({
-            path: `/tasks/${taskId}`,
-            method: 'GET',
-          })
-          .reply(200, JSON.stringify(mockTaskResponse), {
-            headers: { 'content-type': 'application/json' },
-          });
-
-        const response = consumer.markTaskCompleted(taskId);
-
-        await expect(response).rejects.toThrow(ConsumerError);
-        await expect(response).rejects.toThrow(`Failed to extract span context for task ${taskId}`);
-      });
-
       it('should throw ConsumerError when status update fails', async () => {
         // Mock successful task retrieval
         const mockTaskResponse = {
@@ -487,32 +461,6 @@ describe('Consumer', () => {
 
         await expect(response).rejects.toThrow(ConsumerError);
         await expect(response).rejects.toThrow(`Cannot mark task ${taskId} as FAILED: task is in FAILED state, expected IN_PROGRESS state`);
-      });
-
-      it('should throw ConsumerError when span context extraction fails', async () => {
-        vi.spyOn(trace, 'getSpanContext').mockReturnValue(undefined);
-
-        // Mock GET /tasks/{taskId} without trace context
-        const mockTaskResponse = createMockTaskResponse({
-          id: taskId,
-          // Remove trace context to trigger the error
-          traceparent: undefined,
-          tracestate: undefined,
-        });
-
-        mockPool
-          .intercept({
-            path: `/tasks/${taskId}`,
-            method: 'GET',
-          })
-          .reply(200, JSON.stringify(mockTaskResponse), {
-            headers: { 'content-type': 'application/json' },
-          });
-
-        const response = consumer.markTaskFailed(taskId);
-
-        await expect(response).rejects.toThrow(ConsumerError);
-        await expect(response).rejects.toThrow(`Failed to extract span context for task ${taskId}`);
       });
 
       it('should throw ConsumerError when status update fails', async () => {

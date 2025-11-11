@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import type { ApiClient } from '../api';
 import type { Logger } from '../types';
-import type { StageData } from '../types/stage';
+import type { StageData, StageTypesTemplate } from '../types/stage';
 import type { WorkerEvents } from '../types/worker';
 import { Consumer } from './consumer';
 
@@ -28,7 +28,7 @@ import { Consumer } from './consumer';
  * });
  * ```
  */
-export abstract class BaseWorker<StageTypes extends { [K in keyof StageTypes]: StageData } = Record<string, StageData>> extends Consumer<StageTypes> {
+export abstract class BaseWorker<StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>> extends Consumer<StageTypes> {
   private readonly eventEmitter = new EventEmitter();
 
   /**

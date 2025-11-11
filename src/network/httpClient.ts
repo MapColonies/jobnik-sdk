@@ -63,12 +63,6 @@ interface HttpClientOptions {
    * Options for the underlying agent.
    */
   agentOptions?: Agent.Options;
-
-  /**
-   * Logger instance for client operations.
-   * @default new NoopLogger()
-   */
-  logger?: Logger;
 }
 
 /**
@@ -121,8 +115,7 @@ const JITTER_MIN_FACTOR = 0.5;
 /**
  * Creates a RetryAgent with proper configuration for network resilience.
  */
-export function createRetryAgent(options: HttpClientOptions = {}): Dispatcher {
-  const logger = options.logger ?? new NoopLogger();
+export function createRetryAgent(options: HttpClientOptions = {}, logger: Logger = new NoopLogger()): Dispatcher {
   const agentOptions = options.agentOptions ?? {};
   const retryOptions = options.retry ?? {};
   const initialBaseRetryDelayMs = retryOptions.initialBaseRetryDelayMs ?? INITIAL_BASE_RETRY_DELAY_MS;
@@ -159,7 +152,7 @@ export function createRetryAgent(options: HttpClientOptions = {}): Dispatcher {
       // If jitter is disabled, use only the base delay
       const jitterFactor = disableJitter ? 1 : JITTER_MIN_FACTOR + Math.random() * maxJitterFactor;
       const delay = Math.floor(baseDelay * jitterFactor);
-      logger.info(`[RetryAgent] Retry #${attempt + 1} in ${delay}ms due to error: ${err.message}`);
+      logger.info({ msg: `[RetryAgent] Retry #${attempt + 1} in ${delay}ms due to error: ${err.message}` });
       setTimeout(() => cb(null), delay);
     },
   });
@@ -172,7 +165,7 @@ export function createRetryAgent(options: HttpClientOptions = {}): Dispatcher {
     agentOptions: Object.keys(agentOptions).length > 0 ? '[Agent Options Present]' : undefined,
   };
 
-  logger.info(`[RetryAgent] Initialized with options: ${JSON.stringify(loggableOptions)}`);
+  logger.info({ msg: `[RetryAgent] Initialized with options: ${JSON.stringify(loggableOptions)}` });
 
   return retryAgent;
 }

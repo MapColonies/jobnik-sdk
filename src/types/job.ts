@@ -3,29 +3,38 @@ import { Prettify } from './utils';
 
 type UserMetadata = components['schemas']['userMetadata'];
 type JobPayload = components['schemas']['jobPayload'];
-type JobGenericProperties = 'userMetadata' | 'data' | 'name';
+type JobGenericProperties = 'userMetadata' | 'data';
+
+export type JobTypesTemplate<JobTypes> = { [K in keyof JobTypes]: JobData };
 
 export interface JobData {
   userMetadata: UserMetadata;
   data: JobPayload;
 }
 
-export type ValidJobName<JobTypes> = Extract<keyof JobTypes, string> | (string & {});
+export type ValidJobType<JobTypes> = Extract<keyof JobTypes, string> | (string & {});
 
-export type InferJobData<JobName, JobTypes> = JobName extends Extract<keyof JobTypes, string> ? JobTypes[JobName] : JobData;
+export type InferJobData<JobType, JobTypes> = JobType extends Extract<keyof JobTypes, string> ? JobTypes[JobType] : JobData;
 
-export type Job<JobName extends string, JobInfo extends JobData = JobData> = Prettify<
+export type Job<
+  JobTypes extends JobTypesTemplate<JobTypes> = Record<string, JobData>,
+  JobType extends ValidJobType<JobTypes> = 'unset',
+  // JobInfo extends JobData = JobData,
+> = Prettify<
   Omit<components['schemas']['job'], JobGenericProperties> & {
-    userMetadata?: JobInfo['userMetadata'];
-    data: JobInfo['data'];
-    name: JobName;
+    // name: JobName;
+    userMetadata?: InferJobData<JobType, JobTypes>['userMetadata'];
+    data: InferJobData<JobType, JobTypes>['data'];
   }
 >;
 
-export type NewJob<JobName extends string, JobInfo extends JobData = JobData> = Prettify<
+export type NewJob<
+  JobTypes extends JobTypesTemplate<JobTypes> = Record<string, JobData>,
+  JobType extends ValidJobType<JobTypes> = 'unset',
+> = Prettify<
   Omit<components['schemas']['createJobPayload'], JobGenericProperties | 'tracestate' | 'traceparent'> & {
-    name: JobName;
-    userMetadata?: JobInfo['userMetadata'];
-    data: JobInfo['data'];
+    // name: JobName;
+    userMetadata?: InferJobData<JobType, JobTypes>['userMetadata'];
+    data: InferJobData<JobType, JobTypes>['data'];
   }
 >;
