@@ -21,7 +21,7 @@ export function createApiClient(baseUrl: string, httpClientOptions: HttpClientOp
     headers: {
       'Content-Type': 'application/json',
     },
-    dispatcher: createRetryAgent(httpClientOptions),
+    dispatcher: createRetryAgent(httpClientOptions, undefined, metrics),
   });
 
   const middleware = {
@@ -39,8 +39,8 @@ export function createApiClient(baseUrl: string, httpClientOptions: HttpClientOp
       onRequest: metricsMiddleware.onRequest,
       onResponse: async (params: Parameters<NonNullable<typeof middleware.onResponse>>[0]) => {
         // Call both response middlewares in sequence
-        await createResponseMiddleware()(params);
         await metricsMiddleware.onResponse?.(params);
+        await createResponseMiddleware()(params);
       },
     });
   }

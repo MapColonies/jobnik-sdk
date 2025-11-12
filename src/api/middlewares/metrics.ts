@@ -4,18 +4,19 @@ import { normalizeStatusCode } from '../../telemetry/metrics-utils';
 
 interface RequestTiming {
   startTime: number;
-  retryCount: number;
 }
 
 /**
  * Creates a middleware that collects HTTP metrics for all requests.
- * Tracks request duration, retry counts, and request sizes.
+ * Tracks request duration and request sizes.
+ *
+ * Note: Retry metrics are tracked in the HTTP client's retry callback, not here.
  *
  * @param metrics - The metrics instance to record to
  * @returns An openapi-fetch middleware
  */
 export function createMetricsMiddleware(metrics: JobnikMetrics): Middleware {
-  // Use WeakMap to store timing data keyed by request URL
+  // Use Map to store timing data keyed by request
   // This allows us to correlate onRequest and onResponse calls
   const requestTimings = new Map<string, RequestTiming>();
 
@@ -24,12 +25,7 @@ export function createMetricsMiddleware(metrics: JobnikMetrics): Middleware {
       const requestKey = `${request.method}:${request.url}:${Date.now()}`;
       const startTime = performance.now();
 
-      // Check if this is a retry by looking for existing timing with same URL
-      const existingTiming = Array.from(requestTimings.entries()).find(([key]) => key.startsWith(`${request.method}:${request.url}:`));
-
-      const retryCount = existingTiming ? existingTiming[1].retryCount + 1 : 0;
-
-      requestTimings.set(requestKey, { startTime, retryCount });
+      requestTimings.set(requestKey, { startTime });
 
       // Track request size if body exists
       if (request.body) {
@@ -63,17 +59,10 @@ export function createMetricsMiddleware(metrics: JobnikMetrics): Middleware {
           const duration = (performance.now() - timing.startTime) / 1000;
           const method = request.method.toUpperCase();
           const statusCode = normalizeStatusCode(response.status);
-          const wasRetried = timing.retryCount > 0 ? 'true' : 'false';
 
           // Track request duration
-          metrics.httpRequestDuration.labels(method, statusCode.toString(), wasRetried).observe(duration);
-
-          // Track retries if this was a retry
-          if (timing.retryCount > 0) {
-            // We don't have the exact retry reason from undici here, so we use 'unknown'
-            // In the future, we could enhance this by parsing error messages
-            metrics.httpRetriesTotal.labels(method, 'unknown').inc(timing.retryCount);
-          }
+          // Note: We don't track 'retried' here as retries are tracked in the retry callback
+          metrics.httpRequestDuration.labels(method, statusCode.toString(), 'false').observe(duration);
 
           // Clean up timing data
           requestTimings.delete(requestKey);
