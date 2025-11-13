@@ -4,6 +4,7 @@ import { propagation } from '@opentelemetry/api';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { MockAgent, type MockPool } from 'undici';
 import createClient from 'openapi-fetch';
+import { Registry } from 'prom-client';
 import { createApiClient } from '../../src/api/index';
 import { Worker } from '../../src/clients/worker';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
@@ -12,7 +13,7 @@ import type { Task } from '../../src/types/task';
 import type { Logger } from '../../src/types';
 import type { TaskHandler, WorkerOptions } from '../../src/types/worker';
 import { Producer } from '../../src/clients';
-import { createTestMetrics } from '../utils/metrics';
+import { Metrics } from '../../src/telemetry/metrics';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
@@ -60,6 +61,7 @@ describe('Worker', () => {
   let worker: Worker;
   let logger: Logger;
   let taskHandler: MockedFunction<TaskHandler>;
+  const metrics = new Metrics(new Registry());
 
   const baseUrl = 'http://localhost:8080';
   const stageType: string = 'image-resize';
@@ -84,15 +86,7 @@ describe('Worker', () => {
       pullingInterval: 500,
     };
 
-    worker = new Worker(
-      taskHandler,
-      stageType,
-      workerOptions,
-      logger,
-      apiClient,
-      new Producer(apiClient, logger, createTestMetrics()),
-      createTestMetrics()
-    );
+    worker = new Worker(taskHandler, stageType, workerOptions, logger, apiClient, new Producer(apiClient, logger, metrics), metrics);
   });
 
   afterEach(async () => {
@@ -530,8 +524,8 @@ describe('Worker', () => {
           },
           logger,
           apiClient,
-          new Producer(apiClient, logger, createTestMetrics()),
-          createTestMetrics()
+          new Producer(apiClient, logger, metrics),
+          metrics
         );
 
         expect(customWorker).toBeDefined();

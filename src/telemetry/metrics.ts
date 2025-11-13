@@ -1,15 +1,7 @@
+/* eslint-disable @typescript-eslint/no-magic-numbers */
 // Optional import - gracefully handle missing prom-client
-import type { Counter, Histogram, Gauge, Registry } from 'prom-client';
+import { Histogram, Counter, Gauge, Registry } from 'prom-client';
 import { readPackageJsonSync } from '@map-colonies/read-pkg';
-
-let promClient: typeof import('prom-client') | undefined;
-
-try {
-  // Synchronous require for prom-client peer dependency
-  promClient = require('prom-client');
-} catch {
-  // prom-client not installed - metrics will be no-op
-}
 
 export interface JobnikMetrics {
   // Worker metrics
@@ -27,7 +19,7 @@ export interface JobnikMetrics {
   consumerTaskUpdatesTotal: Counter<'stage_type' | 'status' | 'result'>;
 
   // Producer metrics
-  producerJobCreateDuration: Histogram<'job_type' | 'priority' | 'result'>;
+  producerJobCreateDuration: Histogram<'result'>;
   producerStageCreateDuration: Histogram<'stage_type' | 'result'>;
   producerTaskCreateDuration: Histogram<'stage_type' | 'result'>;
   producerOperationsTotal: Counter<'operation' | 'result'>;
@@ -35,7 +27,6 @@ export interface JobnikMetrics {
   // HTTP metrics
   httpRequestDuration: Histogram<'method' | 'status_code' | 'retried'>;
   httpRetriesTotal: Counter<'method' | 'reason'>;
-  httpRequestSize: Histogram<'method'>;
 
   // Lifecycle metrics
   workerUptimeSeconds: Gauge<'stage_type'>;
@@ -47,7 +38,7 @@ export interface JobnikMetrics {
    *
    * @param stageType - The stage type the worker will process
    */
-  initializeWorkerMetrics(stageType: string): void;
+  initializeWorkerMetrics: (stageType: string) => void;
 
   /**
    * Sets up the uptime gauge to automatically calculate uptime on collection.
@@ -55,76 +46,14 @@ export interface JobnikMetrics {
    * @param stageType - The stage type the worker processes
    * @param startTime - The timestamp when the worker started (in milliseconds)
    */
-  setupWorkerUptimeCollection(stageType: string, startTime: number): void;
-}
-
-// No-op metric implementations for when metrics are disabled
-class NoOpHistogram {
-  labels(...args: any[]): this {
-    return this;
-  }
-  observe(value: number): void {}
-  startTimer(): (labels?: any) => void {
-    return () => {};
-  }
-}
-
-class NoOpCounter {
-  labels(...args: any[]): this {
-    return this;
-  }
-  inc(value?: number): void {}
-}
-
-class NoOpGauge {
-  labels(...args: any[]): this {
-    return this;
-  }
-  set(value: number): void {}
-  inc(value?: number): void {}
-  dec(value?: number): void {}
-}
-
-/**
- * No-op implementation of JobnikMetrics for when metrics collection is disabled.
- * These metrics do nothing but satisfy the interface, eliminating
- * the need for null checks throughout the codebase.
- */
-class NoOpMetrics implements JobnikMetrics {
-  public workerTaskDuration = new NoOpHistogram() as any;
-  public workerTasksCompletedTotal = new NoOpCounter() as any;
-  public workerTasksFailedTotal = new NoOpCounter() as any;
-  public workerTasksActive = new NoOpGauge() as any;
-  public workerCircuitBreakerState = new NoOpGauge() as any;
-  public workerCircuitBreakerOpensTotal = new NoOpCounter() as any;
-  public workerConsecutiveEmptyPolls = new NoOpGauge() as any;
-  public consumerDequeueDuration = new NoOpHistogram() as any;
-  public consumerTaskUpdateDuration = new NoOpHistogram() as any;
-  public consumerTaskUpdatesTotal = new NoOpCounter() as any;
-  public producerJobCreateDuration = new NoOpHistogram() as any;
-  public producerStageCreateDuration = new NoOpHistogram() as any;
-  public producerTaskCreateDuration = new NoOpHistogram() as any;
-  public producerOperationsTotal = new NoOpCounter() as any;
-  public httpRequestDuration = new NoOpHistogram() as any;
-  public httpRetriesTotal = new NoOpCounter() as any;
-  public httpRequestSize = new NoOpHistogram() as any;
-  public workerUptimeSeconds = new NoOpGauge() as any;
-  public sdkInfo = new NoOpGauge() as any;
-
-  public initializeWorkerMetrics(stageType: string): void {
-    // No-op
-  }
-
-  public setupWorkerUptimeCollection(stageType: string, startTime: number): void {
-    // No-op
-  }
+  setupWorkerUptimeCollection: (stageType: string, startTime: number) => void;
 }
 
 /**
  * Real implementation of JobnikMetrics using prom-client.
  * Registers all metrics with the provided Prometheus registry.
  */
-class Metrics implements JobnikMetrics {
+export class Metrics implements JobnikMetrics {
   public readonly workerTaskDuration: Histogram<'stage_type' | 'status'>;
   public readonly workerTasksCompletedTotal: Counter<'stage_type'>;
   public readonly workerTasksFailedTotal: Counter<'stage_type' | 'error_type'>;
@@ -141,17 +70,10 @@ class Metrics implements JobnikMetrics {
   public readonly producerOperationsTotal: Counter<'operation' | 'result'>;
   public readonly httpRequestDuration: Histogram<'method' | 'status_code' | 'retried'>;
   public readonly httpRetriesTotal: Counter<'method' | 'reason'>;
-  public readonly httpRequestSize: Histogram<'method'>;
   public readonly workerUptimeSeconds: Gauge<'stage_type'>;
   public readonly sdkInfo: Gauge<'version' | 'node_version' | 'platform' | 'arch'>;
 
   public constructor(registry: Registry) {
-    if (!promClient) {
-      throw new Error('prom-client is required but not installed');
-    }
-
-    const { Histogram, Counter, Gauge } = promClient;
-
     this.workerTaskDuration = new Histogram({
       name: 'jobnik_sdk_worker_task_duration_seconds',
       help: 'Task processing duration in seconds',
@@ -271,14 +193,6 @@ class Metrics implements JobnikMetrics {
       registers: [registry],
     });
 
-    this.httpRequestSize = new Histogram({
-      name: 'jobnik_sdk_http_request_size_bytes',
-      help: 'Size of HTTP request bodies sent to the API',
-      labelNames: ['method'],
-      buckets: [100, 1000, 10000, 100000, 1000000],
-      registers: [registry],
-    });
-
     this.workerUptimeSeconds = new Gauge({
       name: 'jobnik_sdk_worker_uptime_seconds',
       help: 'Time in seconds since the worker started',
@@ -295,22 +209,6 @@ class Metrics implements JobnikMetrics {
 
     // Initialize SDK info metric immediately
     this.initializeSdkInfo();
-  }
-
-  /**
-   * Initializes SDK info metric with version and runtime information.
-   * Called automatically during construction.
-   */
-  private initializeSdkInfo(): void {
-    const packageJson = readPackageJsonSync();
-    this.sdkInfo
-      .labels({
-        version: packageJson.version ?? 'unknown',
-        node_version: process.version,
-        platform: process.platform,
-        arch: process.arch,
-      })
-      .set(1);
   }
 
   /**
@@ -348,24 +246,26 @@ class Metrics implements JobnikMetrics {
     const gauge = this.workerUptimeSeconds;
 
     // Set collect callback on the gauge instance to calculate uptime dynamically
-    (gauge as any).collect = function (this: any) {
+    (gauge as unknown as { collect: () => void }).collect = function (this: unknown): void {
       const uptimeSeconds = (Date.now() - startTime) / 1000;
       gauge.labels(stageType).set(uptimeSeconds);
     };
   }
-}
 
-/**
- * Creates and registers all SDK metrics with the provided registry.
- * If no registry is provided or prom-client is not installed, returns no-op metrics.
- *
- * @param registry - Prometheus registry to register metrics with
- * @returns JobnikMetrics instance (real or no-op)
- */
-export function createMetrics(registry?: Registry): JobnikMetrics {
-  if (!registry || !promClient) {
-    return new NoOpMetrics();
+  /**
+   * Initializes SDK info metric with version and runtime information.
+   * Called automatically during construction.
+   */
+  private initializeSdkInfo(): void {
+    const packageJson = readPackageJsonSync();
+    this.sdkInfo
+      .labels({
+        version: packageJson.version ?? 'unknown',
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        node_version: process.version,
+        platform: process.platform,
+        arch: process.arch,
+      })
+      .set(1);
   }
-
-  return new Metrics(registry);
 }

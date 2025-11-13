@@ -86,10 +86,5 @@
   "peerDependencies": {
     "@opentelemetry/api": "^1.9.0",
     "prom-client": "^15.0.0"
-  },
-  "peerDependenciesMeta": {
-    "prom-client": {
-      "optional": true
-    }
   }
 }

@@ -129,7 +129,7 @@ export class Producer<
             );
           }
 
-          const duration = endTimer({ job_type: jobData.name as string, priority, result: 'success' });
+          const duration = endTimer({ result: 'success' });
           this.metrics.producerOperationsTotal.labels('create_job', 'success').inc();
 
           this.logger.info(
@@ -149,7 +149,7 @@ export class Producer<
           span.setAttribute(ATTR_MESSAGING_MESSAGE_CONVERSATION_ID, data.id);
           return data;
         } catch (error) {
-          endTimer({ job_type: jobData.name as string, priority, result: 'error' });
+          endTimer({ result: 'error' });
           this.metrics.producerOperationsTotal.labels('create_job', 'error').inc();
           throw error;
         }

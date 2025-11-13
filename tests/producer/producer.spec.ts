@@ -1,19 +1,19 @@
 import { describe, it, expect, afterEach, vi, beforeAll, afterAll } from 'vitest';
-import { propagation, trace } from '@opentelemetry/api';
+import { propagation } from '@opentelemetry/api';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { MockAgent, MockPool } from 'undici';
+import { Registry } from 'prom-client';
 import { createApiClient } from '../../src/api/index';
 import { Producer } from '../../src/clients/producer';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
 import { JobId, StageId } from '../../src/types/brands';
 import { ProducerError, API_ERROR_CODES } from '../../src/errors';
-import { createTestMetrics } from '../utils/metrics';
+import { Metrics } from '../../src/telemetry/metrics';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
 // Add type declaration for global mockAgent
 declare global {
-  // eslint-disable-next-line no-var
   var mockAgentForTest: MockAgent;
 }
 
@@ -39,6 +39,7 @@ describe('Producer', () => {
   let apiClient: ReturnType<typeof createApiClient>;
   let producer: Producer;
   let logger: NoopLogger;
+  const metrics = new Metrics(new Registry());
 
   const baseUrl = 'http://localhost:8080';
 
@@ -85,7 +86,6 @@ describe('Producer', () => {
     });
 
     logger = new NoopLogger();
-    const metrics = createTestMetrics();
     producer = new Producer(apiClient, logger, metrics);
   });
 
@@ -409,7 +409,7 @@ describe('Producer', () => {
       });
 
       it('should create typed tasks with custom generics', async () => {
-        const typedProducer = new Producer<TestJobTypes, TestStageTypes>(apiClient, logger, createTestMetrics());
+        const typedProducer = new Producer<TestJobTypes, TestStageTypes>(apiClient, logger, metrics);
 
         const taskData = [
           {
@@ -577,7 +577,7 @@ describe('Producer', () => {
 
   describe('integration scenarios', () => {
     it('should handle a complete workflow: job -> stage -> tasks', async () => {
-      const typedProducer = new Producer<TestJobTypes, TestStageTypes>(apiClient, logger, createTestMetrics());
+      const typedProducer = new Producer<TestJobTypes, TestStageTypes>(apiClient, logger, metrics);
 
       // Step 1: Create Job
       const jobData = {

@@ -1,11 +1,11 @@
 import createClient, { type Client } from 'openapi-fetch';
 import type { paths } from '../types';
 import { createRetryAgent, HttpClientOptions } from '../network/httpClient';
+import type { JobnikMetrics } from '../telemetry/metrics';
 import { wrapClient } from './wrapper';
 import { createErrorHandlingMiddleware } from './middlewares/error';
 import { createResponseMiddleware } from './middlewares/response';
 import { createMetricsMiddleware } from './middlewares/metrics';
-import type { JobnikMetrics } from '../telemetry/metrics';
 
 type Prettify<T> = {
   [K in keyof T]: T[K];
@@ -27,7 +27,7 @@ export function createApiClient(baseUrl: string, httpClientOptions: HttpClientOp
   const middleware = {
     onError: createErrorHandlingMiddleware(),
     onResponse: createResponseMiddleware(),
-    async onRequest() {
+    async onRequest(): Promise<void> {
       // Request handling logic can be added here if needed
     },
   };

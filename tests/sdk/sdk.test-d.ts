@@ -1,4 +1,5 @@
 import { describe, it, expectTypeOf } from 'vitest';
+import { Registry } from 'prom-client';
 import { JobnikSDK } from '../../src/sdk';
 import type { IConsumer } from '../../src/types/consumer';
 import type { IProducer } from '../../src/types/producer';
@@ -36,10 +37,13 @@ interface TestStageTypes {
   };
 }
 
+const metricsRegistry = new Registry();
+
 describe('JobnikSDK type generics', () => {
   it('can be constructed with custom types', () => {
     const sdk = new JobnikSDK<TestJobTypes, TestStageTypes>({
       baseUrl: 'http://localhost:8080',
+      metricsRegistry,
     });
     expectTypeOf(sdk).toExtend<JobnikSDK<TestJobTypes, TestStageTypes>>();
   });
@@ -47,6 +51,7 @@ describe('JobnikSDK type generics', () => {
   it('can be constructed without explicit generics', () => {
     const sdk = new JobnikSDK({
       baseUrl: 'http://localhost:8080',
+      metricsRegistry,
     });
     expectTypeOf(sdk).toExtend<JobnikSDK>();
   });
@@ -54,6 +59,7 @@ describe('JobnikSDK type generics', () => {
   it('can be constructed with just job types', () => {
     const sdk = new JobnikSDK<TestJobTypes>({
       baseUrl: 'http://localhost:8080',
+      metricsRegistry,
     });
     expectTypeOf(sdk).toExtend<JobnikSDK<TestJobTypes>>();
   });
@@ -61,6 +67,7 @@ describe('JobnikSDK type generics', () => {
   it('can be constructed with all configuration options', () => {
     const sdk = new JobnikSDK<TestJobTypes, TestStageTypes>({
       baseUrl: 'http://localhost:8080',
+      metricsRegistry,
       logger: new NoopLogger(),
       httpClientOptions: {
         retry: { maxRetries: 3 },
@@ -74,6 +81,7 @@ describe('JobnikSDK type generics', () => {
 describe('JobnikSDK.getConsumer', () => {
   it('returns correctly typed Consumer for default generics', () => {
     const sdk = new JobnikSDK({
+      metricsRegistry,
       baseUrl: 'http://localhost:8080',
     });
 
@@ -83,6 +91,7 @@ describe('JobnikSDK.getConsumer', () => {
 
   it('returns correctly typed Consumer for custom stage types', () => {
     const sdk = new JobnikSDK<TestJobTypes, TestStageTypes>({
+      metricsRegistry,
       baseUrl: 'http://localhost:8080',
     });
 
@@ -94,6 +103,7 @@ describe('JobnikSDK.getConsumer', () => {
 describe('JobnikSDK.getProducer', () => {
   it('returns correctly typed Producer for default generics', () => {
     const sdk = new JobnikSDK({
+      metricsRegistry,
       baseUrl: 'http://localhost:8080',
     });
 
@@ -103,6 +113,7 @@ describe('JobnikSDK.getProducer', () => {
 
   it('returns correctly typed Producer for custom types', () => {
     const sdk = new JobnikSDK<TestJobTypes, TestStageTypes>({
+      metricsRegistry,
       baseUrl: 'http://localhost:8080',
     });
 
@@ -112,6 +123,7 @@ describe('JobnikSDK.getProducer', () => {
 
   it('returns correctly typed Producer with only job types', () => {
     const sdk = new JobnikSDK<TestJobTypes>({
+      metricsRegistry,
       baseUrl: 'http://localhost:8080',
     });
 
@@ -123,6 +135,7 @@ describe('JobnikSDK.getProducer', () => {
 describe('JobnikSDK.createWorker', () => {
   it('returns correctly typed Worker for default generics', () => {
     const sdk = new JobnikSDK({
+      metricsRegistry,
       baseUrl: 'http://localhost:8080',
     });
 
@@ -135,6 +148,7 @@ describe('JobnikSDK.createWorker', () => {
 
   it('returns correctly typed Worker for custom stage types', () => {
     const sdk = new JobnikSDK<TestJobTypes, TestStageTypes>({
+      metricsRegistry,
       baseUrl: 'http://localhost:8080',
     });
 
@@ -146,6 +160,7 @@ describe('JobnikSDK.createWorker', () => {
 
   it('accepts worker options parameter', () => {
     const sdk = new JobnikSDK<TestJobTypes, TestStageTypes>({
+      metricsRegistry,
       baseUrl: 'http://localhost:8080',
     });
 
@@ -172,6 +187,7 @@ describe('JobnikSDK constructor parameter types', () => {
 
   it('accepts optional logger parameter', () => {
     const sdk = new JobnikSDK({
+      metricsRegistry,
       baseUrl: 'http://localhost:8080',
       logger: new NoopLogger(),
     });
@@ -181,6 +197,7 @@ describe('JobnikSDK constructor parameter types', () => {
   it('accepts optional httpClientOptions parameter', () => {
     const sdk = new JobnikSDK({
       baseUrl: 'http://localhost:8080',
+      metricsRegistry,
       httpClientOptions: {
         retry: { maxRetries: 3 },
       },

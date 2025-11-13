@@ -1,6 +1,7 @@
 import type { Middleware } from 'openapi-fetch';
 import type { JobnikMetrics } from '../../telemetry/metrics';
 import { normalizeStatusCode } from '../../telemetry/metrics-utils';
+import { MILLISECOND_IN_SECOND } from '../../common/constants';
 
 interface RequestTiming {
   startTime: number;
@@ -15,31 +16,17 @@ interface RequestTiming {
  * @param metrics - The metrics instance to record to
  * @returns An openapi-fetch middleware
  */
-export function createMetricsMiddleware(metrics: JobnikMetrics): Middleware {
+export function createMetricsMiddleware(metrics: JobnikMetrics): { onRequest: Middleware['onRequest']; onResponse: Middleware['onResponse'] } {
   // Use Map to store timing data keyed by request
   // This allows us to correlate onRequest and onResponse calls
   const requestTimings = new Map<string, RequestTiming>();
 
   return {
-    async onRequest({ request }) {
+    onRequest({ request }): void {
       const requestKey = `${request.method}:${request.url}:${Date.now()}`;
       const startTime = performance.now();
 
       requestTimings.set(requestKey, { startTime });
-
-      // Track request size if body exists
-      if (request.body) {
-        try {
-          const clonedRequest = request.clone();
-          const bodyText = await clonedRequest.text();
-          const sizeBytes = new TextEncoder().encode(bodyText).length;
-          const method = request.method.toUpperCase();
-
-          metrics.httpRequestSize.labels(method).observe(sizeBytes);
-        } catch {
-          // If we can't read the body (e.g., stream already consumed), skip size metric
-        }
-      }
 
       // Store the request key in a header so we can retrieve it in onResponse
       // This is a workaround since openapi-fetch doesn't pass context between middleware calls
@@ -48,15 +35,15 @@ export function createMetricsMiddleware(metrics: JobnikMetrics): Middleware {
       return undefined;
     },
 
-    async onResponse({ response, request }) {
+    onResponse({ response, request }): void {
       const requestKey = request.headers.get('X-Jobnik-Request-Key');
 
-      if (requestKey) {
+      if (requestKey !== null) {
         const timing = requestTimings.get(requestKey);
 
         if (timing) {
           // Manual timing is kept here due to the Map-based storage pattern
-          const duration = (performance.now() - timing.startTime) / 1000;
+          const duration = (performance.now() - timing.startTime) / MILLISECOND_IN_SECOND;
           const method = request.method.toUpperCase();
           const statusCode = normalizeStatusCode(response.status);
 

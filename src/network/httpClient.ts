@@ -172,7 +172,7 @@ export function createRetryAgent(options: HttpClientOptions = {}, logger: Logger
 
       // Track retry metrics if metrics instance is provided
       if (metrics) {
-        const method = context.opts.method?.toUpperCase() ?? 'UNKNOWN';
+        const method = context.opts.method.toUpperCase();
         const reason = categorizeRetryReason(err);
         metrics.httpRetriesTotal.labels(method, reason).inc();
       }

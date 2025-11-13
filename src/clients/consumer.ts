@@ -212,7 +212,7 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
   ): Promise<void> {
     // Use prom-client's startTimer helper (only if stageType provided)
     const statusLower = status.toLowerCase() as 'completed' | 'failed';
-    const endTimer = stageType ? this.metrics.consumerTaskUpdateDuration.startTimer() : null;
+    const endTimer = stageType !== undefined ? this.metrics.consumerTaskUpdateDuration.startTimer() : null;
 
     this.logger.debug(
       {
@@ -257,7 +257,7 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
 
         if (error !== undefined) {
           // Record metrics if stageType is provided (from Worker)
-          if (endTimer && stageType) {
+          if (endTimer && stageType !== undefined) {
             endTimer({ stage_type: stageType, status: statusLower });
             this.metrics.consumerTaskUpdatesTotal.labels(stageType, statusLower, 'error').inc();
           }
@@ -271,7 +271,7 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
 
         // Record metrics if stageType is provided (from Worker)
         let duration = 0;
-        if (endTimer && stageType) {
+        if (endTimer && stageType !== undefined) {
           duration = endTimer({ stage_type: stageType, status: statusLower });
           this.metrics.consumerTaskUpdatesTotal.labels(stageType, statusLower, 'success').inc();
         }

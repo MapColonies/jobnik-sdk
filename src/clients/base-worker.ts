@@ -3,8 +3,8 @@ import type { ApiClient } from '../api';
 import type { Logger } from '../types';
 import type { StageData, StageTypesTemplate } from '../types/stage';
 import type { WorkerEvents } from '../types/worker';
-import { Consumer } from './consumer';
 import type { JobnikMetrics } from '../telemetry/metrics';
+import { Consumer } from './consumer';
 
 /**
  * Abstract base class for worker implementations with event handling capabilities.

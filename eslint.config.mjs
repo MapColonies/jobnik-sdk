@@ -3,11 +3,11 @@ import jestConfig from '@map-colonies/eslint-config/jest';
 import { config } from '@map-colonies/eslint-config/helpers';
 
 const SemanticConventionsExtension = {
-  // selector: 'objectLiteralProperty',
+  selector: ['objectLiteralProperty', 'typeProperty'],
   format: null,
   filter: {
     match: true,
-    regex: '^(_)$',
+    regex: '^(_|stage_type)$',
   },
 };
 

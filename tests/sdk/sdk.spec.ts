@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { MockAgent } from 'undici';
+import { describe, it, expect } from 'vitest';
+import { Registry } from 'prom-client';
 import { JobnikSDK } from '../../src/sdk';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
 import type { HttpClientOptions } from '../../src/network/httpClient';
@@ -37,11 +37,13 @@ interface TestStageTypes {
 
 describe('JobnikSDK', () => {
   const baseUrl = 'http://localhost:8080';
+  const metricsRegistry = new Registry();
 
   describe('construction', () => {
     it('should create SDK instance with required options', () => {
       const sdk = new JobnikSDK({
         baseUrl,
+        metricsRegistry,
       });
 
       expect(sdk).toBeInstanceOf(JobnikSDK);
@@ -58,6 +60,7 @@ describe('JobnikSDK', () => {
         baseUrl,
         logger,
         httpClientOptions,
+        metricsRegistry,
       });
 
       expect(sdk).toBeInstanceOf(JobnikSDK);
@@ -66,6 +69,7 @@ describe('JobnikSDK', () => {
     it('should create SDK instance with custom types', () => {
       const sdk = new JobnikSDK<TestJobTypes, TestStageTypes>({
         baseUrl,
+        metricsRegistry,
       });
 
       expect(sdk).toBeInstanceOf(JobnikSDK);
@@ -76,6 +80,7 @@ describe('JobnikSDK', () => {
     it('should return a Consumer instance', () => {
       const sdk = new JobnikSDK({
         baseUrl,
+        metricsRegistry,
       });
 
       const consumer = sdk.getConsumer();
@@ -90,6 +95,7 @@ describe('JobnikSDK', () => {
     it('should return Consumer with correct type signature for typed SDK', () => {
       const sdk = new JobnikSDK<TestJobTypes, TestStageTypes>({
         baseUrl,
+        metricsRegistry,
       });
 
       const consumer = sdk.getConsumer();
@@ -103,6 +109,7 @@ describe('JobnikSDK', () => {
     it('should return a Producer instance', () => {
       const sdk = new JobnikSDK({
         baseUrl,
+        metricsRegistry,
       });
 
       const producer = sdk.getProducer();
@@ -117,6 +124,7 @@ describe('JobnikSDK', () => {
     it('should return Producer with correct type signature for typed SDK', () => {
       const sdk = new JobnikSDK<TestJobTypes, TestStageTypes>({
         baseUrl,
+        metricsRegistry,
       });
 
       const producer = sdk.getProducer();
@@ -130,13 +138,14 @@ describe('JobnikSDK', () => {
     it('should return a Worker instance', () => {
       const sdk = new JobnikSDK({
         baseUrl,
+        metricsRegistry,
       });
 
       const taskHandler = async () => {
         // Mock task handler
       };
 
-      const worker = sdk.createWorker(taskHandler, 'test-stage');
+      const worker = sdk.createWorker('test-stage', taskHandler);
 
       expect(worker).toBeDefined();
       // Check it has expected methods
@@ -147,13 +156,14 @@ describe('JobnikSDK', () => {
     it('should return Worker with options', () => {
       const sdk = new JobnikSDK({
         baseUrl,
+        metricsRegistry,
       });
 
       const taskHandler = async () => {
         // Mock task handler
       };
 
-      const worker = sdk.createWorker(taskHandler, 'test-stage', {
+      const worker = sdk.createWorker('test-stage', taskHandler, {
         concurrency: 5,
         pullingInterval: 2000,
       });
@@ -165,13 +175,14 @@ describe('JobnikSDK', () => {
     it('should return Worker for typed SDK', () => {
       const sdk = new JobnikSDK<TestJobTypes, TestStageTypes>({
         baseUrl,
+        metricsRegistry,
       });
 
       const taskHandler = async () => {
         // Mock task handler for image-resize
       };
 
-      const worker = sdk.createWorker(taskHandler, 'image-resize');
+      const worker = sdk.createWorker('image-resize', taskHandler);
 
       expect(worker).toBeDefined();
       expect(worker.start).toBeFunction();
@@ -182,6 +193,7 @@ describe('JobnikSDK', () => {
     it('should provide consistent instances across multiple calls', () => {
       const sdk = new JobnikSDK({
         baseUrl,
+        metricsRegistry,
       });
 
       const consumer1 = sdk.getConsumer();
@@ -197,13 +209,14 @@ describe('JobnikSDK', () => {
     it('should allow creating multiple workers', () => {
       const sdk = new JobnikSDK({
         baseUrl,
+        metricsRegistry,
       });
 
       const taskHandler1 = async () => {};
       const taskHandler2 = async () => {};
 
-      const worker1 = sdk.createWorker(taskHandler1, 'stage-1');
-      const worker2 = sdk.createWorker(taskHandler2, 'stage-2');
+      const worker1 = sdk.createWorker('stage-1', taskHandler1);
+      const worker2 = sdk.createWorker('stage-2', taskHandler2);
 
       expect(worker1).toBeDefined();
       expect(worker2).toBeDefined();

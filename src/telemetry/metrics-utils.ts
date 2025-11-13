@@ -1,7 +1,5 @@
-import { StatusCodes } from 'http-status-codes';
+import statusCodes from 'http-status-codes';
 import { NetworkError, APIError, JOBNIK_SDK_ERROR_CODES } from '../errors/sdkErrors';
-
-const MAX_LABEL_LENGTH = 128;
 
 /**
  * Normalizes HTTP status codes to prevent cardinality explosion.
@@ -9,28 +7,28 @@ const MAX_LABEL_LENGTH = 128;
  */
 export function normalizeStatusCode(code: number): string {
   // Common success codes
-  if (code === StatusCodes.OK || code === StatusCodes.CREATED || code === StatusCodes.NO_CONTENT) {
+  if (code === statusCodes.OK || code === statusCodes.CREATED || code === statusCodes.NO_CONTENT) {
     return String(code);
   }
 
   // Client errors
-  if (code === StatusCodes.NOT_FOUND) return String(code);
+  if (code === statusCodes.NOT_FOUND) return String(code);
 
   // Server errors
   if (
-    code === StatusCodes.INTERNAL_SERVER_ERROR ||
-    code === StatusCodes.BAD_GATEWAY ||
-    code === StatusCodes.SERVICE_UNAVAILABLE ||
-    code === StatusCodes.GATEWAY_TIMEOUT
+    code === statusCodes.INTERNAL_SERVER_ERROR ||
+    code === statusCodes.BAD_GATEWAY ||
+    code === statusCodes.SERVICE_UNAVAILABLE ||
+    code === statusCodes.GATEWAY_TIMEOUT
   ) {
     return String(code);
   }
 
   // Catch-all for other codes
-  if (code >= StatusCodes.OK && code < StatusCodes.MULTIPLE_CHOICES) return '2xx';
-  if (code >= StatusCodes.MULTIPLE_CHOICES && code < StatusCodes.BAD_REQUEST) return '3xx';
-  if (code >= StatusCodes.BAD_REQUEST && code < StatusCodes.INTERNAL_SERVER_ERROR) return '4xx';
-  if (code >= StatusCodes.INTERNAL_SERVER_ERROR) return '5xx';
+  if (code >= statusCodes.OK && code < statusCodes.MULTIPLE_CHOICES) return '2xx';
+  if (code >= statusCodes.MULTIPLE_CHOICES && code < statusCodes.BAD_REQUEST) return '3xx';
+  if (code >= statusCodes.BAD_REQUEST && code < statusCodes.INTERNAL_SERVER_ERROR) return '4xx';
+  if (code >= statusCodes.INTERNAL_SERVER_ERROR) return '5xx';
 
   return 'other';
 }

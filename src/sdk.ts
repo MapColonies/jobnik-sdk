@@ -1,3 +1,5 @@
+import type { Registry } from 'prom-client';
+import { Metrics, type JobnikMetrics } from './telemetry/metrics';
 import { Worker } from './clients/worker';
 import { Consumer } from './clients/consumer';
 import { Producer } from './clients/producer';
@@ -11,8 +13,6 @@ import type { IProducer } from './types/producer';
 import type { IConsumer } from './types/consumer';
 import { HttpClientOptions } from './network/httpClient';
 import { NoopLogger } from './telemetry/noopLogger';
-import { createMetrics, type JobnikMetrics } from './telemetry/metrics';
-import type { Registry } from 'prom-client';
 
 /**
  * Main SDK class for interacting with the Jobnik job management system.
@@ -70,6 +70,7 @@ export class JobnikSDK<
   StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>,
 > implements IJobnikSDK<JobTypes, StageTypes>
 {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   declare public readonly _: {
     readonly jobTypes: JobTypes;
     readonly stageTypes: StageTypes;
@@ -88,7 +89,7 @@ export class JobnikSDK<
    * @param options.baseUrl - Base URL of the Jobnik API server
    * @param options.httpClientOptions - Optional HTTP client configuration (timeouts, retry settings)
    * @param options.logger - Optional logger instance for operation tracking (defaults to NoopLogger)
-   * @param options.metricsRegistry - Optional Prometheus registry for metrics collection (metrics disabled if not provided)
+   * @param options.metricsRegistry - Prometheus registry for metrics collection (metrics disabled if not provided)
    *
    * @example
    * ```typescript
@@ -120,9 +121,9 @@ export class JobnikSDK<
    * });
    * ```
    */
-  public constructor(options: { baseUrl: string; httpClientOptions?: HttpClientOptions; logger?: Logger; metricsRegistry?: Registry }) {
+  public constructor(options: { baseUrl: string; httpClientOptions?: HttpClientOptions; logger?: Logger; metricsRegistry: Registry }) {
     this.logger = options.logger ?? new NoopLogger();
-    this.metrics = createMetrics(options.metricsRegistry);
+    this.metrics = new Metrics(options.metricsRegistry);
     this.apiClient = createApiClient(options.baseUrl, options.httpClientOptions, this.metrics);
     this.consumer = new Consumer(this.apiClient, this.logger, this.metrics);
     this.producer = new Producer(this.apiClient, this.logger, this.metrics);

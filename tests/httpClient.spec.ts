@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MockAgent, MockPool } from 'undici';
 import { createRetryAgent } from '../src/network/httpClient';
+import { JobnikMetrics } from '../src/telemetry/metrics';
 
 /* eslint-disable */
 // Add type declaration for global mockAgent
@@ -135,7 +136,7 @@ describe('createRetryAgent', () => {
         agentOptions: { keepAliveTimeout: 1 },
       },
       undefined,
-      mockMetrics as any
+      mockMetrics as unknown as JobnikMetrics
     );
 
     const req = agent.request({ origin: 'http://localhost:8080', path: '/test', method: 'GET' });
@@ -169,7 +170,7 @@ describe('createRetryAgent', () => {
         agentOptions: { keepAliveTimeout: 1 },
       },
       undefined,
-      mockMetrics as any
+      mockMetrics as unknown as JobnikMetrics
     );
 
     const req = agent.request({ origin: 'http://localhost:8080', path: '/test', method: 'GET' });
