@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Registry } from 'prom-client';
 import { JobnikSDK } from '../../src/sdk';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
@@ -37,7 +37,11 @@ interface TestStageTypes {
 
 describe('JobnikSDK', () => {
   const baseUrl = 'http://localhost:8080';
-  const metricsRegistry = new Registry();
+  let metricsRegistry: Registry;
+
+  beforeEach(() => {
+    metricsRegistry = new Registry();
+  });
 
   describe('construction', () => {
     it('should create SDK instance with required options', () => {

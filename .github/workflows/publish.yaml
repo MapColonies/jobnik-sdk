@@ -2,7 +2,7 @@ name: publish
 
 on:
   workflow_dispatch:
-  release: 
+  release:
     types: [published]
 
 jobs:
@@ -16,7 +16,7 @@ jobs:
       - name: Init nodejs
         uses: ./.github/actions/init-npm
         with:
-          node-version: 22.x
+          node-version: 24.x
       - uses: JS-DevTools/npm-publish@v4
         with:
           token: ${{ secrets.NPM_TOKEN }}
