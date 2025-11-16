@@ -46,7 +46,7 @@ export interface WorkerOptions {
   /** Circuit breaker configuration for task dequeue operations */
   dequeueTaskCircuitBreaker?: CircuitBreakerOptions;
   /** Options for exponential backoff during task dequeue retries */
-  backoffOptions: BackoffOptions;
+  backoffOptions?: BackoffOptions;
 }
 
 /**

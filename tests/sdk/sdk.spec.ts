@@ -169,7 +169,11 @@ describe('JobnikSDK', () => {
 
       const worker = sdk.createWorker('test-stage', taskHandler, {
         concurrency: 5,
-        pullingInterval: 2000,
+        backoffOptions: {
+          initialBaseRetryDelayMs: 2000,
+          backoffFactor: 2,
+          maxDelayMs: 30000,
+        },
       });
 
       expect(worker).toBeDefined();

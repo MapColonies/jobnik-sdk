@@ -84,7 +84,7 @@ export interface IJobnikSDK<
     // createWorker: <JobType extends Extract<keyof JobTypes, string>, StageType extends Extract<keyof StageTypes, string>>(
     stageType: StageType,
     taskHandler: TaskHandler<JobTypes, StageTypes, JobType, StageType>,
-    options?: WorkerOptions
+    options: WorkerOptions
   ) => IWorker;
 
   /**
