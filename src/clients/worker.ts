@@ -22,9 +22,7 @@ import { CIRCUIT_BREAKER_STATES, MILLISECOND_IN_SECOND } from '../common/constan
 import type { JobnikMetrics } from '../telemetry/metrics';
 import { categorizeError } from '../telemetry/metrics-utils';
 import { BaseWorker } from './base-worker';
-
-/** Default polling interval in milliseconds for task dequeue operations */
-const DEFAULT_POLLING_INTERVAL = 10000;
+import { ExponentialBackoff } from '../common/backoff';
 
 /** Default circuit breaker configuration with resilient defaults */
 const defaultCircuitBreakerOptions = {
@@ -147,6 +145,8 @@ export class Worker<
   /** Counter for consecutive empty polling attempts (for backoff strategies) */
   private consecutiveEmptyPolls: number = 0;
 
+  private backoff: ExponentialBackoff;
+
   // metrics members
   /** Start time for uptime calculation */
   private readonly startTime: number;
@@ -195,6 +195,8 @@ export class Worker<
 
     // Initialize worker-specific metrics for this stage type
     this.metrics.initializeWorkerMetrics(stageType);
+
+    this.backoff = new ExponentialBackoff(this.options.backoffOptions);
 
     this.taskHandlerCircuitBreaker = new circuitBreaker(this.taskHandler, {
       ...defaultCircuitBreakerOptions,
@@ -558,6 +560,7 @@ export class Worker<
       }
 
       if (task) {
+        this.backoff.reset();
         this.consecutiveEmptyPolls = 0;
         this.metrics.workerConsecutiveEmptyPolls.labels(this.stageType).set(0);
 
@@ -603,7 +606,7 @@ export class Worker<
         span.end();
       }
 
-      await sleep(this.options.pullingInterval ?? DEFAULT_POLLING_INTERVAL);
+      await sleep(this.backoff.getNextDelay());
     }
   }
 

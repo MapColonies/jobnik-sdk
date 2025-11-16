@@ -238,7 +238,7 @@ export class JobnikSDK<
     return new Worker<JobTypes, StageTypes, JobType, StageType>(
       taskHandler,
       stageType,
-      options ?? {},
+      options ?? { backoffOptions: { backoffFactor: 2, initialBaseRetryDelayMs: 1000, maxDelayMs: 60000 } },
       this.logger,
       this.apiClient,
       this.producer,

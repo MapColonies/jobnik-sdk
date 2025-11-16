@@ -16,7 +16,7 @@ jobs:
       - name: Init nodejs
         uses: ./.github/actions/init-npm
         with:
-          node-version: 24.x
+          node-version: 24.11.0
       - uses: JS-DevTools/npm-publish@v4
         with:
           token: ${{ secrets.NPM_TOKEN }}
