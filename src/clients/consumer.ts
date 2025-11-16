@@ -11,6 +11,7 @@ import type { Logger } from '../types';
 import type { IConsumer } from '../types/consumer';
 import { createAPIErrorFromResponse } from '../errors/utils';
 import { JOBNIK_SDK_ERROR_CODES, ConsumerError } from '../errors';
+import type { JobnikMetrics } from '../telemetry/metrics';
 
 /**
  * Client for consuming and processing tasks from the job management system.
@@ -41,10 +42,12 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
    *
    * @param apiClient - HTTP client for API communication
    * @param logger - Logger instance for operation tracking
+   * @param metrics - Metrics instance for Prometheus metrics collection
    */
   public constructor(
     protected readonly apiClient: ApiClient,
-    protected readonly logger: Logger
+    protected readonly logger: Logger,
+    protected readonly metrics: JobnikMetrics
   ) {}
 
   /**
@@ -71,7 +74,8 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
   public async dequeueTask<StageType extends ValidStageType<StageTypes>>(
     stageType: StageType
   ): Promise<Task<InferTaskData<StageType, StageTypes>> | null> {
-    const startTime = performance.now();
+    // Use prom-client's startTimer helper
+    const endTimer = this.metrics.consumerDequeueDuration.startTimer();
 
     this.logger.debug(
       {
@@ -97,7 +101,8 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
 
         // Handle 404 as expected behavior when no tasks are available
         if (response.status === (StatusCodes.NOT_FOUND as number)) {
-          const duration = performance.now() - startTime;
+          const duration = endTimer({ stage_type: stageType, status: 'not_found' });
+
           this.logger.debug(
             {
               operation: 'dequeueTask',
@@ -110,6 +115,8 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
         }
 
         if (error !== undefined) {
+          endTimer({ stage_type: stageType, status: 'error' });
+
           throw new ConsumerError(
             `Failed to dequeue task for stage type ${stageType}`,
             JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
@@ -117,7 +124,7 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
           );
         }
 
-        const duration = performance.now() - startTime;
+        const duration = endTimer({ stage_type: stageType, status: 'success' });
 
         this.logger.info(
           {
@@ -190,6 +197,7 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
    * @param options - Either an object containing the task data directly, or an object containing the taskId to fetch
    * @param options.task - The task object to update (when taskId is undefined)
    * @param options.taskId - The ID of the task to fetch and update (when task is undefined)
+   * @param stageType - Optional stage type for metrics (should be provided by Worker)
    *
    * @throws {ConsumerError} When trace context extraction fails
    * @throws {ConsumerError} When task is not in IN_PROGRESS state
@@ -199,9 +207,12 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
    */
   protected async markTask(
     status: components['schemas']['taskOperationStatus'],
-    options: { task: Task; taskId: undefined } | { taskId: TaskId; task: undefined }
+    options: { task: Task; taskId: undefined } | { taskId: TaskId; task: undefined },
+    stageType?: string
   ): Promise<void> {
-    const startTime = performance.now();
+    // Use prom-client's startTimer helper (only if stageType provided)
+    const statusLower = status.toLowerCase() as 'completed' | 'failed';
+    const endTimer = stageType !== undefined ? this.metrics.consumerTaskUpdateDuration.startTimer() : null;
 
     this.logger.debug(
       {
@@ -245,6 +256,12 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
         });
 
         if (error !== undefined) {
+          // Record metrics if stageType is provided (from Worker)
+          if (endTimer && stageType !== undefined) {
+            endTimer({ stage_type: stageType, status: statusLower });
+            this.metrics.consumerTaskUpdatesTotal.labels(stageType, statusLower, 'error').inc();
+          }
+
           throw new ConsumerError(
             `Failed to mark task ${task.id} as ${status}`,
             JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
@@ -252,7 +269,12 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
           );
         }
 
-        const duration = performance.now() - startTime;
+        // Record metrics if stageType is provided (from Worker)
+        let duration = 0;
+        if (endTimer && stageType !== undefined) {
+          duration = endTimer({ stage_type: stageType, status: statusLower });
+          this.metrics.consumerTaskUpdatesTotal.labels(stageType, statusLower, 'success').inc();
+        }
 
         this.logger.info(
           {

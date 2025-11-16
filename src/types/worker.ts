@@ -211,4 +211,4 @@ export type InferTaskHandler<
   Sdk extends IJobnikSDK,
   JobType extends ValidJobType<Sdk['_']['jobTypes']> = string,
   StageType extends ValidStageType<Sdk['_']['stageTypes']> = string,
-> = TaskHandler<Sdk['_']['jobTypes'], Sdk['_']['stageTypes']>;
+> = TaskHandler<Sdk['_']['jobTypes'], Sdk['_']['stageTypes'], JobType, StageType>;

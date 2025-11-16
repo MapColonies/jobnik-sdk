@@ -18,6 +18,7 @@ import {
 import { Logger } from '../types';
 import { createAPIErrorFromResponse } from '../errors/utils';
 import { JOBNIK_SDK_ERROR_CODES, ProducerError } from '../errors';
+import type { JobnikMetrics } from '../telemetry/metrics';
 
 const DEFAULT_PRIORITY: Extract<components['schemas']['priority'], 'MEDIUM'> = 'MEDIUM';
 
@@ -60,10 +61,12 @@ export class Producer<
    *
    * @param apiClient - HTTP client for API communication
    * @param logger - Logger instance for operation tracking
+   * @param metrics - Metrics instance for Prometheus metrics collection
    */
   public constructor(
     private readonly apiClient: ApiClient,
-    private readonly logger: Logger
+    private readonly logger: Logger,
+    private readonly metrics: JobnikMetrics
   ) {}
 
   /**
@@ -86,13 +89,13 @@ export class Producer<
    * ```
    */
   public async createJob<JobType extends ValidJobType<JobTypes> = ''>(jobData: NewJob<JobTypes, JobType>): Promise<Job<JobTypes, JobType>> {
-    const startTime = performance.now();
+    const priority = jobData.priority ?? DEFAULT_PRIORITY;
 
     this.logger.debug(
       {
         operation: 'createJob',
         jobName: jobData.name,
-        priority: jobData.priority ?? DEFAULT_PRIORITY,
+        priority,
       },
       'Starting job creation'
     );
@@ -102,44 +105,54 @@ export class Producer<
       {
         attributes: {
           [ATTR_JOB_MANAGER_JOB_NAME]: jobData.name,
-          [ATTR_JOB_MANAGER_JOB_PRIORITY]: jobData.priority ?? DEFAULT_PRIORITY,
+          [ATTR_JOB_MANAGER_JOB_PRIORITY]: priority,
         },
         kind: SpanKind.CLIENT,
       },
       this.logger,
       async (span) => {
+        // Use prom-client's startTimer helper
+        const endTimer = this.metrics.producerJobCreateDuration.startTimer();
+
         propagation.inject(context.active(), jobData);
 
-        const { data, error, response } = await this.apiClient.POST('/jobs', {
-          body: jobData,
-        });
+        try {
+          const { data, error, response } = await this.apiClient.POST('/jobs', {
+            body: jobData,
+          });
 
-        if (error !== undefined) {
-          throw new ProducerError(
-            `Failed to create job ${jobData.name}`,
-            JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-            createAPIErrorFromResponse(response, error)
-          );
-        }
+          if (error !== undefined) {
+            throw new ProducerError(
+              `Failed to create job ${jobData.name}`,
+              JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
+              createAPIErrorFromResponse(response, error)
+            );
+          }
 
-        const duration = performance.now() - startTime;
+          const duration = endTimer({ result: 'success' });
+          this.metrics.producerOperationsTotal.labels('create_job', 'success').inc();
 
-        this.logger.info(
-          {
-            operation: 'createJob',
-            duration,
-            status: 'success',
-            metadata: {
-              jobId: data.id,
-              jobName: jobData.name,
-              priority: jobData.priority ?? 'MEDIUM',
+          this.logger.info(
+            {
+              operation: 'createJob',
+              duration,
+              status: 'success',
+              metadata: {
+                jobId: data.id,
+                jobName: jobData.name,
+                priority,
+              },
             },
-          },
-          'Job created successfully'
-        );
+            'Job created successfully'
+          );
 
-        span.setAttribute(ATTR_MESSAGING_MESSAGE_CONVERSATION_ID, data.id);
-        return data;
+          span.setAttribute(ATTR_MESSAGING_MESSAGE_CONVERSATION_ID, data.id);
+          return data;
+        } catch (error) {
+          endTimer({ result: 'error' });
+          this.metrics.producerOperationsTotal.labels('create_job', 'error').inc();
+          throw error;
+        }
       }
     );
   }
@@ -167,8 +180,6 @@ export class Producer<
     jobId: JobId,
     stageData: NewStage<StageType, InferStageData<StageType, StageTypes>>
   ): Promise<Stage<StageType, InferStageData<StageType, StageTypes>>> {
-    const startTime = performance.now();
-
     this.logger.debug(
       {
         operation: 'createStage',
@@ -189,56 +200,66 @@ export class Producer<
       },
       this.logger,
       async (span) => {
-        const jobResponse = await this.apiClient.GET(`/jobs/{jobId}`, { params: { path: { jobId } } });
+        // Use prom-client's startTimer helper
+        const endTimer = this.metrics.producerStageCreateDuration.startTimer();
 
-        if (jobResponse.error !== undefined) {
-          throw new ProducerError(
-            `Failed to retrieve job ${jobId}`,
-            JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-            createAPIErrorFromResponse(jobResponse.response, jobResponse.error)
-          );
-        }
+        try {
+          const jobResponse = await this.apiClient.GET(`/jobs/{jobId}`, { params: { path: { jobId } } });
 
-        const remoteContext = propagation.extract(context.active(), jobResponse.data);
-        const jobSpanContext = trace.getSpanContext(remoteContext) ?? DEFAULT_SPAN_CONTEXT;
+          if (jobResponse.error !== undefined) {
+            throw new ProducerError(
+              `Failed to retrieve job ${jobId}`,
+              JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
+              createAPIErrorFromResponse(jobResponse.response, jobResponse.error)
+            );
+          }
 
-        span.addLink({
-          context: jobSpanContext,
-        });
+          const remoteContext = propagation.extract(context.active(), jobResponse.data);
+          const jobSpanContext = trace.getSpanContext(remoteContext) ?? DEFAULT_SPAN_CONTEXT;
 
-        propagation.inject(context.active(), jobResponse.data);
+          span.addLink({
+            context: jobSpanContext,
+          });
 
-        const { data, error, response } = await this.apiClient.POST(`/jobs/{jobId}/stage`, {
-          body: stageData,
-          params: { path: { jobId } },
-        });
+          propagation.inject(context.active(), jobResponse.data);
 
-        if (error !== undefined) {
-          throw new ProducerError(
-            `Failed to create stage for job ${jobId}`,
-            JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
-            createAPIErrorFromResponse(response, error)
-          );
-        }
+          const { data, error, response } = await this.apiClient.POST(`/jobs/{jobId}/stage`, {
+            body: stageData,
+            params: { path: { jobId } },
+          });
 
-        const duration = performance.now() - startTime;
+          if (error !== undefined) {
+            throw new ProducerError(
+              `Failed to create stage for job ${jobId}`,
+              JOBNIK_SDK_ERROR_CODES.REQUEST_FAILED_ERROR,
+              createAPIErrorFromResponse(response, error)
+            );
+          }
 
-        this.logger.info(
-          {
-            operation: 'createStage',
-            duration,
-            status: 'success',
-            metadata: {
-              jobId,
-              stageId: data.id,
-              stageType: stageData.type,
+          const duration = endTimer({ stage_type: stageData.type as string, result: 'success' });
+          this.metrics.producerOperationsTotal.labels('create_stage', 'success').inc();
+
+          this.logger.info(
+            {
+              operation: 'createStage',
+              duration,
+              status: 'success',
+              metadata: {
+                jobId,
+                stageId: data.id,
+                stageType: stageData.type,
+              },
             },
-          },
-          'Stage created successfully'
-        );
+            'Stage created successfully'
+          );
 
-        span.setAttribute(ATTR_JOB_MANAGER_STAGE_ID, data.id);
-        return data as Stage<StageType, InferStageData<StageType, StageTypes>>;
+          span.setAttribute(ATTR_JOB_MANAGER_STAGE_ID, data.id);
+          return data as Stage<StageType, InferStageData<StageType, StageTypes>>;
+        } catch (error) {
+          endTimer({ stage_type: stageData.type as string, result: 'error' });
+          this.metrics.producerOperationsTotal.labels('create_stage', 'error').inc();
+          throw error;
+        }
       }
     );
   }
@@ -276,8 +297,6 @@ export class Producer<
     if (taskData.length === 0) {
       throw new ProducerError('Task data cannot be empty', JOBNIK_SDK_ERROR_CODES.EMPTY_TASK_DATA_ERROR);
     }
-
-    const startTime = performance.now();
 
     this.logger.debug(
       {
@@ -336,6 +355,9 @@ export class Producer<
           context: stageSpanContext,
         });
 
+        // Use prom-client's startTimer helper
+        const endTimer = this.metrics.producerTaskCreateDuration.startTimer();
+
         try {
           const tasksWithTraceContext: components['schemas']['createTaskPayload'][] = [];
 
@@ -362,7 +384,8 @@ export class Producer<
             );
           }
 
-          const duration = performance.now() - startTime;
+          const duration = endTimer({ stage_type: stageType as string, result: 'success' });
+          this.metrics.producerOperationsTotal.labels(taskData.length === 1 ? 'create_task' : 'create_tasks', 'success').inc();
 
           this.logger.info(
             {
@@ -381,6 +404,9 @@ export class Producer<
 
           return data as Task<InferTaskData<StageType, StageTypes>>[];
         } catch (error) {
+          endTimer({ stage_type: stageType as string, result: 'error' });
+          this.metrics.producerOperationsTotal.labels(taskData.length === 1 ? 'create_task' : 'create_tasks', 'error').inc();
+
           producerSpans.forEach((span) => {
             span.setStatus({ code: SpanStatusCode.ERROR, message: 'Parent send operation failed' });
           });

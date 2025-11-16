@@ -1,12 +1,14 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 import { describe, it, expectTypeOf } from 'vitest';
+import { Registry } from 'prom-client';
 import { Producer } from '../../src/clients/producer';
 import type { ApiClient } from '../../src/api';
 import type { JobId, StageId, TaskId } from '../../src/types/brands';
-import type { NewJob, InferJobData, JobData } from '../../src/types/job';
+import type { NewJob, JobData } from '../../src/types/job';
 import type { NewStage, InferStageData, StageData } from '../../src/types/stage';
 import type { NewTask, InferTaskData } from '../../src/types/task';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
+import { Metrics } from '../../src/telemetry/metrics';
 
 // Dummy types for testing
 interface TestJobTypes {
@@ -26,28 +28,30 @@ interface TestStageTypes {
   };
 }
 
+const metrics = new Metrics(new Registry());
+
 declare const apiClient: ApiClient;
 
 describe('Producer type generics', () => {
   it('can be constructed with custom types', () => {
-    const producer = new Producer<TestJobTypes, TestStageTypes>(apiClient, new NoopLogger());
+    const producer = new Producer<TestJobTypes, TestStageTypes>(apiClient, new NoopLogger(), metrics);
     expectTypeOf(producer).toExtend<Producer<TestJobTypes, TestStageTypes>>();
   });
 
   it('can be constructed without explicit generics (defaults to object)', () => {
-    const producer = new Producer(apiClient, new NoopLogger());
+    const producer = new Producer(apiClient, new NoopLogger(), metrics);
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-arguments
     expectTypeOf(producer).toExtend<Producer<Record<string, JobData>, Record<string, StageData>>>();
   });
 
   it('can be constructed with just one generic type', () => {
-    const producer = new Producer<TestJobTypes>(apiClient, new NoopLogger());
+    const producer = new Producer<TestJobTypes>(apiClient, new NoopLogger(), metrics);
     expectTypeOf(producer).toExtend<Producer<TestJobTypes>>();
   });
 });
 
 describe('Producer.createJob', () => {
-  const producer = new Producer<TestJobTypes, TestStageTypes>(apiClient, new NoopLogger());
+  const producer = new Producer<TestJobTypes, TestStageTypes>(apiClient, new NoopLogger(), metrics);
 
   it('returns branded jobId', () => {
     const jobData: NewJob<TestJobTypes, 'foo'> = {
@@ -92,7 +96,7 @@ describe('Producer.createJob', () => {
 });
 
 describe('Producer.createStage', () => {
-  const producer = new Producer<TestJobTypes, TestStageTypes>(apiClient, new NoopLogger());
+  const producer = new Producer<TestJobTypes, TestStageTypes>(apiClient, new NoopLogger(), metrics);
 
   it('should require jobId as a branded type', () => {
     expectTypeOf(producer.createStage.bind(producer)).parameter(0).toEqualTypeOf<JobId>();
@@ -149,7 +153,7 @@ describe('Producer.createStage', () => {
 });
 
 describe('Producer.createTask', () => {
-  const producer = new Producer<TestJobTypes, TestStageTypes>(apiClient, new NoopLogger());
+  const producer = new Producer<TestJobTypes, TestStageTypes>(apiClient, new NoopLogger(), metrics);
 
   it('should require branded stageId in the request', () => {
     expectTypeOf(producer.createTasks.bind(producer)).parameter(0).toEqualTypeOf<StageId>();
@@ -189,7 +193,7 @@ describe('Producer.createTask', () => {
 });
 
 describe('Producer with default generics', () => {
-  const producer = new Producer(apiClient, new NoopLogger());
+  const producer = new Producer(apiClient, new NoopLogger(), metrics);
 
   it('allows any jobName but returns default type', () => {
     const jobData = { name: 'foo', userMetadata: {} as Record<string, unknown>, data: {} as Record<string, unknown> };

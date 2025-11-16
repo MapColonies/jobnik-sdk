@@ -1,13 +1,12 @@
 import tsBaseConfig, { namingConventions } from '@map-colonies/eslint-config/ts-base';
-import jestConfig from '@map-colonies/eslint-config/jest';
 import { config } from '@map-colonies/eslint-config/helpers';
 
 const SemanticConventionsExtension = {
-  // selector: 'objectLiteralProperty',
+  selector: ['objectLiteralProperty', 'typeProperty'],
   format: null,
   filter: {
     match: true,
-    regex: '^(_)$',
+    regex: '^(_|stage_type)$',
   },
 };
 
@@ -26,4 +25,4 @@ const customConfig = {
   },
 };
 
-export default config(jestConfig, tsBaseConfig, customConfig, { ignores: ['vitest.config.mts'] });
+export default config(tsBaseConfig, customConfig, { ignores: ['vitest.config.mts'] });

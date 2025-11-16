@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MockAgent, MockPool } from 'undici';
 import { createRetryAgent } from '../src/network/httpClient';
+import { JobnikMetrics } from '../src/telemetry/metrics';
 
 /* eslint-disable */
 // Add type declaration for global mockAgent
@@ -112,5 +113,71 @@ describe('createRetryAgent', () => {
       agentOptions: { keepAliveTimeout: 1 },
     });
     await expect(agent.request({ origin: 'http://localhost:8080', path: '/test', method: 'GET' })).rejects.toThrow();
+  });
+
+  it('should track retry metrics when metrics instance is provided', async () => {
+    expect.assertions(4);
+
+    // Create a mock metrics instance
+    const mockMetrics = {
+      httpRetriesTotal: {
+        labels: vi.fn().mockReturnThis(),
+        inc: vi.fn(),
+      },
+    };
+
+    // Same setup as first test: fail once, succeed once
+    mockPool.intercept({ path: '/test', method: 'GET' }).reply(500, 'fail').times(1);
+    mockPool.intercept({ path: '/test', method: 'GET' }).reply(200, 'ok').times(1);
+
+    const agent = createRetryAgent(
+      {
+        retry: { maxRetries: 1, statusCodes: [500] },
+        agentOptions: { keepAliveTimeout: 1 },
+      },
+      undefined,
+      mockMetrics as unknown as JobnikMetrics
+    );
+
+    const req = agent.request({ origin: 'http://localhost:8080', path: '/test', method: 'GET' });
+    const res = await req;
+
+    expect(res.statusCode).toBe(200);
+    // Verify the retry was tracked
+    expect(mockMetrics.httpRetriesTotal.labels).toHaveBeenCalled();
+    expect(mockMetrics.httpRetriesTotal.labels).toHaveBeenCalledWith('GET', 'status_code');
+    expect(mockMetrics.httpRetriesTotal.inc).toHaveBeenCalled();
+  });
+
+  it('should categorize retry reasons correctly for network errors', async () => {
+    expect.assertions(2);
+
+    // Create a mock metrics instance
+    const mockMetrics = {
+      httpRetriesTotal: {
+        labels: vi.fn().mockReturnThis(),
+        inc: vi.fn(),
+      },
+    };
+
+    // Simulate network error
+    mockPool.intercept({ path: '/test', method: 'GET' }).replyWithError(new Error('ECONNREFUSED')).times(1);
+    mockPool.intercept({ path: '/test', method: 'GET' }).reply(200, 'ok').times(1);
+
+    const agent = createRetryAgent(
+      {
+        retry: { maxRetries: 2, errorCodes: ['ECONNREFUSED'] },
+        agentOptions: { keepAliveTimeout: 1 },
+      },
+      undefined,
+      mockMetrics as unknown as JobnikMetrics
+    );
+
+    const req = agent.request({ origin: 'http://localhost:8080', path: '/test', method: 'GET' });
+    await req;
+
+    // Verify the retry was tracked with correct reason
+    expect(mockMetrics.httpRetriesTotal.labels).toHaveBeenCalledWith('GET', 'network_error');
+    expect(mockMetrics.httpRetriesTotal.inc).toHaveBeenCalledTimes(1);
   });
 });

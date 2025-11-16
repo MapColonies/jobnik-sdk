@@ -1,3 +1,5 @@
+import type { Registry } from 'prom-client';
+import { Metrics, type JobnikMetrics } from './telemetry/metrics';
 import { Worker } from './clients/worker';
 import { Consumer } from './clients/consumer';
 import { Producer } from './clients/producer';
@@ -68,6 +70,7 @@ export class JobnikSDK<
   StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>,
 > implements IJobnikSDK<JobTypes, StageTypes>
 {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   declare public readonly _: {
     readonly jobTypes: JobTypes;
     readonly stageTypes: StageTypes;
@@ -77,6 +80,7 @@ export class JobnikSDK<
   private readonly apiClient: ApiClient;
   private readonly producer: Producer;
   private readonly consumer: Consumer<StageTypes>;
+  private readonly metrics: JobnikMetrics;
 
   /**
    * Creates a new JobnikSDK instance.
@@ -85,6 +89,7 @@ export class JobnikSDK<
    * @param options.baseUrl - Base URL of the Jobnik API server
    * @param options.httpClientOptions - Optional HTTP client configuration (timeouts, retry settings)
    * @param options.logger - Optional logger instance for operation tracking (defaults to NoopLogger)
+   * @param options.metricsRegistry - Prometheus registry for metrics collection (metrics disabled if not provided)
    *
    * @example
    * ```typescript
@@ -97,12 +102,31 @@ export class JobnikSDK<
    *   logger: winston.createLogger({ level: 'info' })
    * });
    * ```
+   *
+   * @example
+   * With Prometheus metrics:
+   * ```typescript
+   * import { Registry } from 'prom-client';
+   *
+   * const registry = new Registry();
+   * const sdk = new JobnikSDK({
+   *   baseUrl: 'https://api.jobnik.example.com',
+   *   metricsRegistry: registry
+   * });
+   *
+   * // Expose metrics endpoint
+   * app.get('/metrics', async (req, res) => {
+   *   res.set('Content-Type', registry.contentType);
+   *   res.send(await registry.metrics());
+   * });
+   * ```
    */
-  public constructor(options: { baseUrl: string; httpClientOptions?: HttpClientOptions; logger?: Logger }) {
+  public constructor(options: { baseUrl: string; httpClientOptions?: HttpClientOptions; logger?: Logger; metricsRegistry: Registry }) {
     this.logger = options.logger ?? new NoopLogger();
-    this.apiClient = createApiClient(options.baseUrl, options.httpClientOptions);
-    this.consumer = new Consumer(this.apiClient, this.logger);
-    this.producer = new Producer(this.apiClient, this.logger);
+    this.metrics = new Metrics(options.metricsRegistry);
+    this.apiClient = createApiClient(options.baseUrl, options.httpClientOptions, this.metrics);
+    this.consumer = new Consumer(this.apiClient, this.logger, this.metrics);
+    this.producer = new Producer(this.apiClient, this.logger, this.metrics);
   }
 
   /**
@@ -211,7 +235,15 @@ export class JobnikSDK<
     taskHandler: TaskHandler<JobTypes, StageTypes, JobType, StageType>,
     options?: WorkerOptions
   ): IWorker {
-    return new Worker<JobTypes, StageTypes, JobType, StageType>(taskHandler, stageType, options ?? {}, this.logger, this.apiClient, this.producer);
+    return new Worker<JobTypes, StageTypes, JobType, StageType>(
+      taskHandler,
+      stageType,
+      options ?? {},
+      this.logger,
+      this.apiClient,
+      this.producer,
+      this.metrics
+    );
   }
 
   /**

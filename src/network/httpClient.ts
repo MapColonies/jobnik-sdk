@@ -3,6 +3,7 @@ import { StatusCodes } from 'http-status-codes';
 import { trace } from '@opentelemetry/api';
 import type { Logger } from '../telemetry/logger';
 import { NoopLogger } from '../telemetry/noopLogger';
+import type { JobnikMetrics } from '../telemetry/metrics';
 
 /**
  * Options for configuring the retry behavior in HTTP requests.
@@ -113,9 +114,34 @@ const MAX_SAFE_RETRY_COUNT = 15;
 const JITTER_MIN_FACTOR = 0.5;
 
 /**
- * Creates a RetryAgent with proper configuration for network resilience.
+ * Categorizes retry reason based on error type for metrics tracking.
+ * @internal
  */
-export function createRetryAgent(options: HttpClientOptions = {}, logger: Logger = new NoopLogger()): Dispatcher {
+function categorizeRetryReason(error: Error): string {
+  const message = error.message.toLowerCase();
+
+  // Check for network-related errors
+  if (message.includes('econnreset') || message.includes('econnrefused') || message.includes('enotfound') || message.includes('eai_again')) {
+    return 'network_error';
+  }
+
+  // Check for timeout errors
+  if (message.includes('timeout') || message.includes('etimedout')) {
+    return 'timeout';
+  }
+
+  // Default to status_code for HTTP response errors
+  return 'status_code';
+}
+
+/**
+ * Creates a RetryAgent with proper configuration for network resilience.
+ *
+ * @param options - HTTP client configuration options
+ * @param logger - Logger instance for retry events
+ * @param metrics - Optional metrics instance to track retry counts
+ */
+export function createRetryAgent(options: HttpClientOptions = {}, logger: Logger = new NoopLogger(), metrics?: JobnikMetrics): Dispatcher {
   const agentOptions = options.agentOptions ?? {};
   const retryOptions = options.retry ?? {};
   const initialBaseRetryDelayMs = retryOptions.initialBaseRetryDelayMs ?? INITIAL_BASE_RETRY_DELAY_MS;
@@ -143,6 +169,14 @@ export function createRetryAgent(options: HttpClientOptions = {}, logger: Logger
         cb(err);
         return;
       }
+
+      // Track retry metrics if metrics instance is provided
+      if (metrics) {
+        const method = context.opts.method.toUpperCase();
+        const reason = categorizeRetryReason(err);
+        metrics.httpRetriesTotal.labels(method, reason).inc();
+      }
+
       // Calculate exponential backoff delay with jitter
       const baseDelay = Math.min(
         initialBaseRetryDelayMs * Math.pow(RETRY_BACKOFF_FACTOR, Math.min(attempt, MAX_SAFE_RETRY_COUNT)),

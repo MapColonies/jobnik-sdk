@@ -1,13 +1,15 @@
 import { describe, it, expect, afterEach, vi, beforeAll, afterAll } from 'vitest';
-import { propagation, trace } from '@opentelemetry/api';
+import { propagation } from '@opentelemetry/api';
 import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { MockAgent, type MockPool } from 'undici';
+import { Registry } from 'prom-client';
 import { createApiClient } from '../../src/api/index';
 import { Consumer } from '../../src/clients/consumer';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
 import type { StageId, TaskId } from '../../src/types/brands';
 import { ConsumerError, API_ERROR_CODES } from '../../src/errors';
 import type { Task } from '../../src/types/task';
+import { Metrics } from '../../src/telemetry/metrics';
 
 propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
@@ -61,6 +63,7 @@ describe('Consumer', () => {
   let apiClient: ReturnType<typeof createApiClient>;
   let consumer: Consumer;
   let logger: NoopLogger;
+  const metrics = new Metrics(new Registry());
 
   const baseUrl = 'http://localhost:8080';
 
@@ -96,7 +99,7 @@ describe('Consumer', () => {
     });
 
     logger = new NoopLogger();
-    consumer = new Consumer(apiClient, logger);
+    consumer = new Consumer(apiClient, logger, metrics);
   });
 
   afterEach(() => {
@@ -153,7 +156,7 @@ describe('Consumer', () => {
       });
 
       it('should dequeue typed tasks with custom generics', async () => {
-        const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger);
+        const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger, metrics);
 
         const mockTaskResponse = createMockTaskResponse({
           id: 'task-typed-123' as TaskId,
@@ -550,7 +553,7 @@ describe('Consumer', () => {
 
   describe('integration scenarios', () => {
     it('should handle a complete task processing workflow: dequeue -> complete', async () => {
-      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger);
+      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger, metrics);
       const stageType = 'image-resize';
 
       // Step 1: Dequeue Task
@@ -615,7 +618,7 @@ describe('Consumer', () => {
     });
 
     it('should handle a complete task processing workflow: dequeue -> fail', async () => {
-      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger);
+      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger, metrics);
       const stageType = 'data-transform';
 
       // Step 1: Dequeue Task
@@ -704,7 +707,7 @@ describe('Consumer', () => {
     });
 
     it('should handle typed consumer with type safety', async () => {
-      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger);
+      const typedConsumer = new Consumer<TestStageTypes>(apiClient, logger, metrics);
 
       const mockImageTask = createMockTaskResponse({
         id: 'task-typed-image' as TaskId,

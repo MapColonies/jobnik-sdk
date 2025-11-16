@@ -52,8 +52,7 @@ async function getOpenApiSpec(): Promise<Record<string, Record<string, string>>>
 
       openApiSpec = extractOperationIds(bundledSpec as OpenAPIV3.Document);
       /* c8 ignore next 4 */
-    } catch (error) {
-      console.warn('Failed to load OpenAPI spec:', error);
+    } catch {
       openApiSpec = {};
     }
   }
