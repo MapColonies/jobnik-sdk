@@ -7,7 +7,7 @@ export class ExponentialBackoff {
   private readonly options: Required<BackoffOptions>;
   private currentAttempt = 1;
 
-  constructor(options: BackoffOptions) {
+  public constructor(options: BackoffOptions) {
     this.options = {
       disableJitter: false,
       maxJitterFactor: 0.25,
@@ -32,6 +32,7 @@ export class ExponentialBackoff {
       return Math.floor(cappedDelay);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-magic-numbers
     const randomFactor = (Math.random() * 2 - 1) * maxJitterFactor;
 
     const finalDelay = cappedDelay * (1 + randomFactor);

@@ -21,8 +21,8 @@ import type { JobId, StageId, TaskId } from '../types/brands';
 import { CIRCUIT_BREAKER_STATES, MILLISECOND_IN_SECOND } from '../common/constants';
 import type { JobnikMetrics } from '../telemetry/metrics';
 import { categorizeError } from '../telemetry/metrics-utils';
-import { BaseWorker } from './base-worker';
 import { ExponentialBackoff } from '../common/backoff';
+import { BaseWorker } from './base-worker';
 
 /** Default circuit breaker configuration with resilient defaults */
 const defaultCircuitBreakerOptions = {
@@ -145,7 +145,7 @@ export class Worker<
   /** Counter for consecutive empty polling attempts (for backoff strategies) */
   private consecutiveEmptyPolls: number = 0;
 
-  private backoff: ExponentialBackoff;
+  private readonly backoff: ExponentialBackoff;
 
   // metrics members
   /** Start time for uptime calculation */
