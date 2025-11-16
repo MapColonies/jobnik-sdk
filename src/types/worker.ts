@@ -14,7 +14,10 @@ import { BackoffOptions } from './backoff';
  * Configuration options for circuit breaker behavior.
  * Subset of Opossum circuit breaker options for task processing resilience.
  */
-export type CircuitBreakerOptions = Pick<OpossumOptions, 'enabled' | 'rollingCountTimeout' | 'errorThresholdPercentage' | 'resetTimeout'>;
+export type CircuitBreakerOptions = Pick<
+  OpossumOptions,
+  'enabled' | 'rollingCountTimeout' | 'errorThresholdPercentage' | 'resetTimeout' | 'volumeThreshold'
+>;
 
 /**
  * Configuration options for worker behavior and performance tuning.
