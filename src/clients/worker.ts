@@ -196,7 +196,7 @@ export class Worker<
     // Initialize worker-specific metrics for this stage type
     this.metrics.initializeWorkerMetrics(stageType);
 
-    this.backoff = new ExponentialBackoff(this.options.backoffOptions);
+    this.backoff = new ExponentialBackoff(this.options.backoffOptions ?? { backoffFactor: 2, initialBaseRetryDelayMs: 1000, maxDelayMs: 60000 });
 
     this.taskHandlerCircuitBreaker = new circuitBreaker(this.taskHandler, {
       ...defaultCircuitBreakerOptions,
