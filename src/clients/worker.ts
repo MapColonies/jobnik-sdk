@@ -399,7 +399,28 @@ export class Worker<
             'Task handler firing'
           );
 
-          await this.taskHandlerCircuitBreaker.fire(task, taskContext as unknown as TaskHandlerContext<JobTypes, StageTypes, JobType, StageType>);
+          const taskHandlerSpan = tracer.startSpan(`execute task handler`, {
+            kind: SpanKind.INTERNAL,
+            attributes: {
+              [ATTR_MESSAGING_MESSAGE_ID]: task.id,
+              [ATTR_JOB_MANAGER_STAGE_ID]: task.stageId,
+              [ATTR_MESSAGING_DESTINATION_NAME]: this.stageType,
+              ...BASE_ATTRIBUTES,
+            },
+          });
+
+          const taskHandlerCtx = trace.setSpan(context.active(), taskHandlerSpan);
+
+          try {
+            await context.with(taskHandlerCtx, async () => {
+              await this.taskHandlerCircuitBreaker.fire(task, taskContext as unknown as TaskHandlerContext<JobTypes, StageTypes, JobType, StageType>);
+            });
+          } catch (error) {
+            taskHandlerSpan.recordException(error as Error);
+            taskHandlerSpan.setStatus({ code: SpanStatusCode.ERROR });
+          } finally {
+            taskHandlerSpan.end();
+          }
           this.logger.debug({ taskId: task.id, stageType: this.stageType }, 'Task handler succeeded');
 
           // Use startTimer's returned function to record duration with labels
