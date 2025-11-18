@@ -521,6 +521,7 @@ describe('Worker', () => {
               errorThresholdPercentage: 25,
               resetTimeout: 60000,
             },
+            backoffOptions: { backoffFactor: 2, initialBaseRetryDelayMs: 1000, maxDelayMs: 60000 },
           },
           logger,
           apiClient,

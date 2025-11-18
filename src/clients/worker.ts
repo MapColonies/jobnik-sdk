@@ -418,6 +418,7 @@ export class Worker<
           } catch (error) {
             taskHandlerSpan.recordException(error as Error);
             taskHandlerSpan.setStatus({ code: SpanStatusCode.ERROR });
+            throw error;
           } finally {
             taskHandlerSpan.end();
           }
