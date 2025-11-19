@@ -413,7 +413,7 @@ export class Worker<
 
           try {
             await context.with(taskHandlerCtx, async () => {
-              await this.taskHandlerCircuitBreaker.fire(task, taskContext as unknown as TaskHandlerContext<JobTypes, StageTypes, JobType, StageType>);
+              await this.taskHandlerCircuitBreaker.fire(task, taskContext as TaskHandlerContext<JobTypes, StageTypes, JobType, StageType>);
             });
           } catch (error) {
             taskHandlerSpan.recordException(error as Error);
