@@ -3,6 +3,9 @@ import { Prettify } from './utils';
 
 type UserMetadata = components['schemas']['userMetadata'];
 type JobPayload = components['schemas']['jobPayload'];
+/**
+ * @inline
+ */
 type JobGenericProperties = 'userMetadata' | 'data';
 
 export type JobTypesTemplate<JobTypes> = { [K in keyof JobTypes]: JobData };
@@ -16,6 +19,23 @@ export type ValidJobType<JobTypes> = Extract<keyof JobTypes, string> | (string &
 
 export type InferJobData<JobType, JobTypes> = JobType extends Extract<keyof JobTypes, string> ? JobTypes[JobType] : JobData;
 
+/**
+ * @example
+ * ```typescript
+ {
+   id: 'job-123',
+   name: 'process-order',
+   status: 'completed',
+   priority: 5,
+   createdAt: '2025-11-20T10:00:00Z',
+   updatedAt: '2025-11-20T10:05:00Z',
+   startedAt: '2025-11-20T10:00:30Z',
+   completedAt: '2025-11-20T10:05:00Z',
+   data: { orderId: 'ord-456', amount: 99.99 },
+   userMetadata: { customerId: 'cust-789' }
+ }
+```
+ */
 export type Job<
   JobTypes extends JobTypesTemplate<JobTypes> = Record<string, JobData>,
   JobType extends ValidJobType<JobTypes> = 'unset',
@@ -28,6 +48,17 @@ export type Job<
   }
 >;
 
+/**
+ * @example
+ * ```typescript
+ {
+   name: 'process-order',
+   priority: 5,
+   data: { orderId: 'ord-456', amount: 99.99 },
+   userMetadata: { customerId: 'cust-789' }
+ }
+```
+ */
 export type NewJob<
   JobTypes extends JobTypesTemplate<JobTypes> = Record<string, JobData>,
   JobType extends ValidJobType<JobTypes> = 'unset',

@@ -70,6 +70,9 @@ export class JobnikSDK<
   StageTypes extends StageTypesTemplate<StageTypes> = Record<string, StageData>,
 > implements IJobnikSDK<JobTypes, StageTypes>
 {
+  /**
+   * @internal
+   */
   // eslint-disable-next-line @typescript-eslint/naming-convention
   declare public readonly _: {
     readonly jobTypes: JobTypes;

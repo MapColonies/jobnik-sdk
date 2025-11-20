@@ -18,6 +18,23 @@ export type ValidStageType<StageTypes> = Extract<keyof StageTypes, string> | (st
 
 export type InferStageData<StageType, StageTypes> = StageType extends Extract<keyof StageTypes, string> ? StageTypes[StageType] : StageData;
 
+/**
+ * @example
+ * ```typescript
+ {
+   id: 'stage-123',
+   type: 'image-processing',
+   status: 'completed',
+   percentage: 100,
+   jobId: 'job-123',
+   order: 1,
+   data: { imageUrl: 'https://example.com/image.jpg', filters: ['resize', 'compress'] },
+   userMetadata: { userId: 'user-456' },
+   traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+   tracestate: null
+ }
+```
+ */
 export type Stage<StageType extends string = string, StageInfo extends StageData = StageData> = Prettify<
   Omit<components['schemas']['stageResponse'], StageGenericProperties> & {
     userMetadata?: StageInfo['userMetadata'];
@@ -26,6 +43,16 @@ export type Stage<StageType extends string = string, StageInfo extends StageData
   }
 >;
 
+/**
+ * @example
+ * ```typescript
+ {
+   type: 'image-processing',
+   data: { imageUrl: 'https://example.com/image.jpg', filters: ['resize', 'compress'] },
+   userMetadata: { userId: 'user-456' }
+ }
+```
+ */
 export type NewStage<StageType extends string = string, StageInfo extends StageData = StageData> = Prettify<
   Omit<components['schemas']['createStagePayload'], StageGenericProperties | 'tracestate' | 'traceparent'> & {
     type: StageType;
