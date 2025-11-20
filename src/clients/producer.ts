@@ -178,7 +178,8 @@ export class Producer<
    */
   public async createStage<StageType extends ValidStageType<StageTypes>>(
     jobId: JobId,
-    stageData: NewStage<StageType, InferStageData<StageType, StageTypes>>
+    stageData: NewStage<StageType, InferStageData<StageType, StageTypes>>,
+    createAsWaiting: boolean = false
   ): Promise<Stage<StageType, InferStageData<StageType, StageTypes>>> {
     this.logger.debug(
       {
@@ -224,7 +225,7 @@ export class Producer<
           propagation.inject(context.active(), jobResponse.data);
 
           const { data, error, response } = await this.apiClient.POST(`/jobs/{jobId}/stage`, {
-            body: stageData,
+            body: { ...stageData, startAsWaiting: createAsWaiting },
             params: { path: { jobId } },
           });
 
