@@ -87,8 +87,6 @@ const task = await producer.createTask(stage.id, {
 ### Process Tasks (Worker)
 
 ```typescript
-import { Worker } from '@map-colonies/jobnik-sdk';
-
 // Define task handler
 const taskHandler = async (task, context) => {
   const { sourceUrl, targetPath } = task.data;
@@ -104,10 +102,10 @@ const taskHandler = async (task, context) => {
   }
 };
 
-// Create and start worker
-const worker = new Worker(
-  taskHandler,
+// Create and start worker using the SDK
+const worker = sdk.createWorker(
   'resize',
+  taskHandler,
   {
     concurrency: 5,
     pullingInterval: 5000
