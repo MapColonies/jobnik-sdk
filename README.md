@@ -108,7 +108,11 @@ const worker = sdk.createWorker(
   taskHandler,
   {
     concurrency: 5,
-    pullingInterval: 5000
+    backoffOptions: {
+      initialBaseRetryDelayMs: 1000,
+      maxDelayMs: 60000,
+      backoffFactor: 2
+    }
   }
 );
 
