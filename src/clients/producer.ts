@@ -163,6 +163,7 @@ export class Producer<
    * @template StageType - The stage type name, must be a key from StageTypes
    * @param jobId - Branded job ID from a previously created job
    * @param stageData - Stage configuration including type, metadata, and data
+   * @param createAsWaiting - Optional flag to create the stage with waiting status. If true, the stage will not start processing immediately.
    * @returns Promise resolving to the created stage with assigned ID
    *
    * @throws {ProducerError} When job retrieval fails, trace context extraction fails, or stage creation fails
