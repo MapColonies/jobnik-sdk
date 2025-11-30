@@ -163,7 +163,7 @@ const sdk = new JobnikSDK({
     agentOptions?: Agent.Options;     // HTTP agent options
   };
   logger?: Logger;                    // Optional: Custom logger (defaults to NoopLogger)
-  metricsRegistry?: Registry;         // Optional: Prometheus registry for metrics
+  metricsRegistry: Registry;          // Required: Prometheus registry for metrics
 });
 ```
 
