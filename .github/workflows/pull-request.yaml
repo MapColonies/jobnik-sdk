@@ -45,3 +45,12 @@ jobs:
         # Only works if you set `reportOnFailure: true` in your vite config as specified above
         if: always()
         uses: davelosert/vitest-coverage-report-action@v2
+
+  e2e:
+    name: Run End-to-End Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run E2E tests
+        uses: MapColonies/jobnik-e2e/.github/actions/e2e-tests@master
+        with:
+          sdk_version: ${{ github.event.pull_request.head.sha }}
