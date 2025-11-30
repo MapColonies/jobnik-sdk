@@ -111,11 +111,7 @@ const worker = new Worker(
   {
     concurrency: 5,
     pullingInterval: 5000
-  },
-  sdk.getApiClient(),
-  sdk.getLogger(),
-  sdk.getProducer(),
-  sdk.getMetrics()
+  }
 );
 
 await worker.start();
@@ -149,17 +145,6 @@ app.get('/metrics', async (req, res) => {
 ### OpenTelemetry Tracing
 
 The SDK automatically creates spans for all operations when OpenTelemetry is configured in your application. Trace context is propagated through jobs, stages, and tasks.
-
-```typescript
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-
-const otelSdk = new NodeSDK({
-  instrumentations: [getNodeAutoInstrumentations()]
-});
-
-otelSdk.start();
-```
 
 ## Configuration Options
 
