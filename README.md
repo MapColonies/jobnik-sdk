@@ -152,9 +152,15 @@ The SDK automatically creates spans for all operations when OpenTelemetry is con
 const sdk = new JobnikSDK({
   baseUrl: string;                    // Required: Jobnik API base URL
   httpClientOptions?: {               // Optional: HTTP client configuration
-    timeout?: number;                 // Request timeout in milliseconds
-    retryAttempts?: number;          // Number of retry attempts
-    retryDelay?: number;             // Delay between retries in milliseconds
+    retry?: {                         // Retry configuration
+      maxRetries?: number;            // Maximum number of retries
+      statusCodes?: number[];         // HTTP status codes to retry
+      errorCodes?: string[];          // Error codes to retry
+      initialBaseRetryDelayMs?: number; // Initial base delay in ms
+      disableJitter?: boolean;        // Disable random jitter in delay
+      maxJitterFactor?: number;       // Maximum jitter factor
+    };
+    agentOptions?: Agent.Options;     // HTTP agent options
   };
   logger?: Logger;                    // Optional: Custom logger (defaults to NoopLogger)
   metricsRegistry?: Registry;         // Optional: Prometheus registry for metrics
