@@ -92,7 +92,7 @@ export class JobnikSDK<
    * @param options.baseUrl - Base URL of the Jobnik API server
    * @param options.httpClientOptions - Optional HTTP client configuration (timeouts, retry settings)
    * @param options.logger - Optional logger instance for operation tracking (defaults to NoopLogger)
-   * @param options.metricsRegistry - Prometheus registry for metrics collection (metrics disabled if not provided)
+   * @param options.metricsRegistry - Prometheus registry for metrics collection
    *
    * @example
    * ```typescript

@@ -26,7 +26,7 @@ export type InferJobData<JobType, JobTypes> = JobType extends Extract<keyof JobT
    id: 'job-123',
    name: 'process-order',
    status: 'completed',
-   priority: 5,
+   priority: 'MEDIUM,
    createdAt: '2025-11-20T10:00:00Z',
    updatedAt: '2025-11-20T10:05:00Z',
    startedAt: '2025-11-20T10:00:30Z',
@@ -53,7 +53,7 @@ export type Job<
  * ```typescript
  {
    name: 'process-order',
-   priority: 5,
+   priority: 'MEDIUM',
    data: { orderId: 'ord-456', amount: 99.99 },
    userMetadata: { customerId: 'cust-789' }
  }

@@ -28,6 +28,7 @@ import { JobnikSDK } from '@map-colonies/jobnik-sdk';
 
 const sdk = new JobnikSDK({
   baseUrl: 'https://api.jobnik.example.com'
+  metricsRegistry: new Registry()
 });
 ```
 
@@ -54,6 +55,7 @@ interface MyStageTypes {
 
 const sdk = new JobnikSDK<MyJobTypes, MyStageTypes>({
   baseUrl: 'https://api.jobnik.example.com'
+  metricsRegistry: new Registry()
 });
 ```
 
