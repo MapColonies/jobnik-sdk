@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/MapColonies/jobnik-sdk/compare/v0.1.0...v0.2.0) (2025-11-30)
+
+
+### Features
+
+* added option to create stage with waiting status MAPCO-9034 ([#54](https://github.com/MapColonies/jobnik-sdk/issues/54)) ([e747bcd](https://github.com/MapColonies/jobnik-sdk/commit/e747bcd4e2b8fbda2f95861b3b95ccb4e5106fc7))
+
 ## 0.1.0 (2025-11-19)
 
 
