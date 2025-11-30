@@ -28,7 +28,8 @@ export interface IProducer<
    */
   createStage: <StageType extends ValidStageType<StageTypes>>(
     jobId: JobId,
-    stageData: NewStage<StageType, InferStageData<StageType, StageTypes>>
+    stageData: NewStage<StageType, InferStageData<StageType, StageTypes>>,
+    createAsWaiting?: boolean
   ) => Promise<Stage<StageType, InferStageData<StageType, StageTypes>>>;
 
   /**
