@@ -1,13 +1,14 @@
 import { join } from 'node:path';
 import { bundle } from '@readme/openapi-parser';
 import type { FetchResponse, MaybeOptionalInit, Client } from 'openapi-fetch';
-import type { HttpMethod, MediaType, PathsWithMethod } from 'openapi-typescript-helpers';
+import type { HttpMethod, MediaType, PathsWithMethod, RequiredKeysOf } from 'openapi-typescript-helpers';
 import { SpanStatusCode } from '@opentelemetry/api';
-import type { InitParam } from 'openapi-fetch/src/index.js';
 import { StatusCodes } from 'http-status-codes';
 import type { OpenAPIV3 } from 'openapi-types';
 import type { paths } from '../types';
 import { tracer } from '../telemetry/trace';
+
+type InitParam<Init> = RequiredKeysOf<Init> extends never ? [(Init & { [key: string]: unknown })?] : [Init & { [key: string]: unknown }];
 
 function extractIdFromRequest(params: { query?: Record<string, unknown>; path?: Record<string, unknown> }): {
   jobId?: string;
