@@ -95,7 +95,7 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
       },
       this.logger,
       async (span) => {
-        const { data, error, response } = await this.apiClient.PATCH('/stages/{stageType}/tasks/dequeue', {
+        const { data, error, response } = await this.apiClient.PATCH('/v1/stages/{stageType}/tasks/dequeue', {
           params: { path: { stageType } },
         });
 
@@ -250,7 +250,7 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
           context: taskSpanContext,
         });
 
-        const { error, response } = await this.apiClient.PUT('/tasks/{taskId}/status', {
+        const { error, response } = await this.apiClient.PUT('/v1/tasks/{taskId}/status', {
           params: { path: { taskId: task.id } },
           body: { status },
         });
@@ -292,7 +292,7 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
 
   private async fetchTaskForUpdate(taskId: TaskId): Promise<Task> {
     // Fetch task for validation and trace context
-    const taskResponse = await this.apiClient.GET('/tasks/{taskId}', {
+    const taskResponse = await this.apiClient.GET('/v1/tasks/{taskId}', {
       params: { path: { taskId } },
     });
 

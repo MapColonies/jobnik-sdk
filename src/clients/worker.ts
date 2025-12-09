@@ -737,12 +737,12 @@ export class Worker<
   }
 
   private async fetchTaskParents(task: Task): Promise<{ job: Job; stage: Stage }> {
-    const { data: stage, error: stageError } = await this.apiClient.GET('/stages/{stageId}', { params: { path: { stageId: task.stageId } } });
+    const { data: stage, error: stageError } = await this.apiClient.GET('/v1/stages/{stageId}', { params: { path: { stageId: task.stageId } } });
     if (!stage) {
       throw new WorkerError(`Stage not found for ID ${task.stageId}`, 'FAILED_FETCHING_STAGE', stageError);
     }
 
-    const { data: job, error: jobError } = await this.apiClient.GET('/jobs/{jobId}', { params: { path: { jobId: stage.jobId } } });
+    const { data: job, error: jobError } = await this.apiClient.GET('/v1/jobs/{jobId}', { params: { path: { jobId: stage.jobId } } });
 
     if (!job) {
       throw new WorkerError(`Job not found for ID ${stage.jobId}`, 'FAILED_FETCHING_JOB', jobError);
@@ -753,7 +753,7 @@ export class Worker<
 
   private getUpdateJobUserMetadataFunction(jobId: JobId): (metadata: Record<string, unknown>) => Promise<void> {
     return async (metadata: Record<string, unknown>) => {
-      const { error } = await this.apiClient.PATCH('/jobs/{jobId}/user-metadata', {
+      const { error } = await this.apiClient.PATCH('/v1/jobs/{jobId}/user-metadata', {
         params: { path: { jobId } },
         body: { userMetadata: metadata },
       });
@@ -773,7 +773,7 @@ export class Worker<
 
   private getUpdateStageUserMetadataFunction(stageId: StageId): (metadata: Record<string, unknown>) => Promise<void> {
     return async (metadata: Record<string, unknown>) => {
-      const { error } = await this.apiClient.PATCH('/stages/{stageId}/user-metadata', {
+      const { error } = await this.apiClient.PATCH('/v1/stages/{stageId}/user-metadata', {
         params: { path: { stageId } },
         body: { userMetadata: metadata },
       });
@@ -793,7 +793,7 @@ export class Worker<
 
   private getUpdateTaskUserMetadataFunction(taskId: TaskId): (metadata: Record<string, unknown>) => Promise<void> {
     return async (metadata: Record<string, unknown>) => {
-      const { error } = await this.apiClient.PATCH('/tasks/{taskId}/user-metadata', {
+      const { error } = await this.apiClient.PATCH('/v1/tasks/{taskId}/user-metadata', {
         params: { path: { taskId } },
         body: { userMetadata: metadata },
       });

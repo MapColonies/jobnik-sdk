@@ -69,22 +69,22 @@ describe('apiClient tracing', () => {
 
   it('should create a span for the API call', async () => {
     expect.assertions(1);
-    mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(200, []);
+    mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).reply(200, []);
     await tracer.startActiveSpan('Test Span', async (span) => {
-      await apiClient.GET('/jobs');
+      await apiClient.GET('/v1/jobs');
       span.end();
     });
 
     const spans = memoryExporter.getFinishedSpans();
 
-    expect(spans[0]).toHaveProperty('name', 'API Request: GET /jobs');
+    expect(spans[0]).toHaveProperty('name', 'API Request: GET /v1/jobs');
   });
 
   it('should set the operation Id as attribute on the span', async () => {
     expect.assertions(1);
-    mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(200, []);
+    mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).reply(200, []);
     await tracer.startActiveSpan('Test Span', async (span) => {
-      await apiClient.GET('/jobs');
+      await apiClient.GET('/v1/jobs');
       span.end();
     });
     const spans = memoryExporter.getFinishedSpans();
@@ -94,13 +94,13 @@ describe('apiClient tracing', () => {
 
   it('should create a span for the API call when using the request method', async () => {
     expect.assertions(1);
-    mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(200, []);
+    mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).reply(200, []);
     await tracer.startActiveSpan('Test Span', async (span) => {
-      await apiClient.request('get', '/jobs');
+      await apiClient.request('get', '/v1/jobs');
       span.end();
     });
     const spans = memoryExporter.getFinishedSpans();
-    expect(spans[0]).toHaveProperty('name', 'API Request: GET /jobs');
+    expect(spans[0]).toHaveProperty('name', 'API Request: GET /v1/jobs');
   });
 
   it.for([
@@ -133,7 +133,7 @@ describe('apiClient tracing', () => {
     mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(400, 'BadRequest');
     await tracer.startActiveSpan('Test Span', async (span) => {
       try {
-        await apiClient.GET('/jobs');
+        await apiClient.GET('/v1/jobs');
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
         // Catch the error to prevent it from failing the test
@@ -152,7 +152,7 @@ describe('apiClient tracing', () => {
     mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(500, 'Internal Server Error');
     await tracer.startActiveSpan('Test Span', async (span) => {
       try {
-        await apiClient.GET('/jobs');
+        await apiClient.GET('/v1/jobs');
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
         // Catch the error to prevent it from failing the test
