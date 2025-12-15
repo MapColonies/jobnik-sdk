@@ -26,7 +26,7 @@ vi.mock('undici', async () => {
     ...originalModule,
     // Mock agent constructor to return our mockAgent
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    Agent: vi.fn().mockImplementation(() => {
+    Agent: vi.fn().mockImplementation(function () {
       // We'll set this in the test
       return global.mockAgentForTest;
     }),

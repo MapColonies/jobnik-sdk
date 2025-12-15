@@ -3,6 +3,7 @@ import { Consumer } from '../../src/clients/consumer';
 import type { ApiClient } from '../../src/api';
 import type { Task } from '../../src/types/task';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
+import { Metrics } from '../../src/telemetry/metrics';
 
 // Dummy types for testing
 interface TestStageTypes {
@@ -17,27 +18,28 @@ interface TestStageTypes {
 }
 
 declare const apiClient: ApiClient;
+declare const metrics: Metrics;
 
 describe('Consumer type generics', () => {
   it('can be constructed with custom types', () => {
-    const consumer = new Consumer<TestStageTypes>(apiClient, new NoopLogger());
+    const consumer = new Consumer<TestStageTypes>(apiClient, new NoopLogger(), metrics);
     expectTypeOf(consumer).toExtend<Consumer<TestStageTypes>>();
   });
 
   it('can be constructed without explicit generics (defaults to object)', () => {
-    const consumer = new Consumer(apiClient, new NoopLogger());
+    const consumer = new Consumer(apiClient, new NoopLogger(), metrics);
     expectTypeOf(consumer).toExtend<Consumer<object>>();
   });
 
   it('can be constructed with just one generic type', () => {
-    const consumer = new Consumer<TestStageTypes>(apiClient, new NoopLogger());
+    const consumer = new Consumer<TestStageTypes>(apiClient, new NoopLogger(), metrics);
     expectTypeOf(consumer).toExtend<Consumer<TestStageTypes>>();
   });
 });
 
 describe('Consumer dequeueTask type tests', () => {
   it('returns correct type for valid stageType', () => {
-    const consumer = new Consumer<TestStageTypes>(apiClient, new NoopLogger());
+    const consumer = new Consumer<TestStageTypes>(apiClient, new NoopLogger(), metrics);
 
     const taskPromise = consumer.dequeueTask('bar');
 
@@ -46,7 +48,7 @@ describe('Consumer dequeueTask type tests', () => {
   });
 
   it('can return null when no tasks available', () => {
-    const consumer = new Consumer<TestStageTypes>(apiClient, new NoopLogger());
+    const consumer = new Consumer<TestStageTypes>(apiClient, new NoopLogger(), metrics);
 
     const taskPromise = consumer.dequeueTask('bar');
 
@@ -54,7 +56,7 @@ describe('Consumer dequeueTask type tests', () => {
   });
 
   it('returns default type for unknown stageType', () => {
-    const consumer = new Consumer<TestStageTypes>(apiClient, new NoopLogger());
+    const consumer = new Consumer<TestStageTypes>(apiClient, new NoopLogger(), metrics);
 
     const taskPromise = consumer.dequeueTask('unknown');
 
@@ -82,7 +84,7 @@ describe('Consumer dequeueTask type tests', () => {
       };
     }
 
-    const consumer = new Consumer<MultiStageTypes>(apiClient, new NoopLogger());
+    const consumer = new Consumer<MultiStageTypes>(apiClient, new NoopLogger(), metrics);
 
     // Test stage1
     const result1 = consumer.dequeueTask('stage1');
@@ -97,7 +99,7 @@ describe('Consumer dequeueTask type tests', () => {
 });
 
 describe('Consumer with default generics', () => {
-  const consumer = new Consumer(apiClient, new NoopLogger());
+  const consumer = new Consumer(apiClient, new NoopLogger(), metrics);
 
   it('allows any stageType but returns default type', () => {
     const taskPromise = consumer.dequeueTask('any-stage-name');
