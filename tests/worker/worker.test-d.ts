@@ -5,6 +5,19 @@ import type { TaskId } from '../../src/types/brands';
 import { NoopLogger } from '../../src/telemetry/noopLogger';
 import type { TaskHandler, WorkerOptions } from '../../src/types/worker';
 import { IProducer } from '../../src/types/producer';
+import { Metrics } from '../../src/telemetry/metrics';
+import { Logger } from '../../src';
+
+interface TestJobTypes {
+  'image-processing': {
+    userMetadata: { userId: string; priority: number };
+    data: { imageUrl: string; format: string };
+  };
+  'data-export': {
+    userMetadata: { department: string };
+    data: { query: string; format: 'csv' | 'json' };
+  };
+}
 
 // Test stage types for type checking
 interface TestStageTypes {
@@ -29,49 +42,48 @@ interface TestStageTypes {
 declare const apiClient: ApiClient;
 declare const logger: NoopLogger;
 declare const options: WorkerOptions;
-declare const producer: IProducer;
+declare const producer: IProducer<TestJobTypes, TestStageTypes>;
+declare const untypedProducer: IProducer;
+declare const metrics: Metrics;
 
 describe('Worker type generics', () => {
   it('enforces correct task handler signature for specific stage', () => {
-    const taskHandler: TaskHandler<{
-      userMetadata: { e: string };
-      data: { f: number };
-    }> = async (task) => {
+    const taskHandler: TaskHandler<TestJobTypes, TestStageTypes, 'data-export', 'bar'> = async (task) => {
       expectTypeOf(task.userMetadata).toEqualTypeOf<{ e: string } | undefined>();
       expectTypeOf(task.data).toEqualTypeOf<{ f: number }>();
       await Promise.resolve();
     };
 
-    new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer);
+    new Worker<TestJobTypes, TestStageTypes, 'data-export', 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer, metrics);
   });
 
   it('provides correct context types in task handler', () => {
-    const taskHandler: TaskHandler<{ userMetadata: { priority: number }; data: { payload: string[] } }> = async (_task, context) => {
+    const taskHandler: TaskHandler<TestJobTypes, TestStageTypes, 'image-processing', 'baz'> = async (_task, context) => {
       expectTypeOf(context.signal).toEqualTypeOf<AbortSignal>();
-      expectTypeOf(context.logger).toEqualTypeOf<NoopLogger>();
+      expectTypeOf(context.logger).toEqualTypeOf<Logger>();
       await Promise.resolve();
     };
 
-    new Worker<TestStageTypes, 'baz'>(taskHandler, 'baz', options, logger, apiClient, producer);
+    new Worker<TestJobTypes, TestStageTypes, 'image-processing', 'baz'>(taskHandler, 'baz', options, logger, apiClient, producer, metrics);
   });
 
   it('allows construction without explicit generics', () => {
-    const taskHandler: TaskHandler<{ userMetadata: Record<string, unknown>; data: Record<string, unknown> }> = async (task) => {
+    const taskHandler: TaskHandler = async (task) => {
       expectTypeOf(task.userMetadata).toEqualTypeOf<Record<string, unknown> | undefined>();
       expectTypeOf(task.data).toEqualTypeOf<Record<string, unknown>>();
       await Promise.resolve();
     };
 
-    new Worker(taskHandler, 'any-stage', options, logger, apiClient, producer);
+    new Worker(taskHandler, 'any-stage', options, logger, apiClient, untypedProducer, metrics);
   });
 });
 
 describe('Worker method types', () => {
   it('start and stop methods return Promise<void>', () => {
-    const taskHandler: TaskHandler<{ userMetadata: { e: string }; data: { f: number } }> = async () => {
+    const taskHandler: TaskHandler<TestJobTypes, TestStageTypes, 'data-export', 'bar'> = async () => {
       // Empty implementation for type test
     };
-    const worker = new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer);
+    const worker = new Worker<TestJobTypes, TestStageTypes, 'data-export', 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer, metrics);
 
     expectTypeOf(worker.start()).toEqualTypeOf<Promise<void>>();
     expectTypeOf(worker.stop()).toEqualTypeOf<Promise<void>>();
@@ -80,10 +92,10 @@ describe('Worker method types', () => {
 
 describe('Worker event emitter types', () => {
   it('emits correctly typed events', () => {
-    const taskHandler: TaskHandler<{ userMetadata: { e: string }; data: { f: number } }> = async () => {
+    const taskHandler: TaskHandler<TestJobTypes, TestStageTypes, 'data-export', 'bar'> = async () => {
       await Promise.resolve();
     };
-    const worker = new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer);
+    const worker = new Worker<TestJobTypes, TestStageTypes, 'data-export', 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer, metrics);
 
     // Test event listener types
     worker.on('started', (data) => {
@@ -128,10 +140,10 @@ describe('Worker event emitter types', () => {
   });
 
   it('supports event listener management methods', () => {
-    const taskHandler: TaskHandler<{ userMetadata: { e: string }; data: { f: number } }> = async () => {
+    const taskHandler: TaskHandler<TestJobTypes, TestStageTypes, 'data-export', 'bar'> = async () => {
       await Promise.resolve();
     };
-    const worker = new Worker<TestStageTypes, 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer);
+    const worker = new Worker<TestJobTypes, TestStageTypes, 'data-export', 'bar'>(taskHandler, 'bar', options, logger, apiClient, producer, metrics);
 
     const listener = (): void => {};
 
@@ -152,7 +164,7 @@ describe('TaskHandler without explicit types', () => {
     };
 
     // This should work without TypeScript errors
-    new Worker(taskHandler, 'any-stage', options, logger, apiClient, producer);
+    new Worker(taskHandler, 'any-stage', options, logger, apiClient, producer, metrics);
   });
 
   it('works with minimal task handler signature', () => {
@@ -161,6 +173,6 @@ describe('TaskHandler without explicit types', () => {
       await Promise.resolve();
     };
 
-    new Worker(taskHandler, 'simple-stage', options, logger, apiClient, producer);
+    new Worker(taskHandler, 'simple-stage', options, logger, apiClient, producer, metrics);
   });
 });

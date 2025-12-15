@@ -21,7 +21,7 @@ vi.mock('undici', async () => {
   return {
     ...originalModule,
     // Mock agent constructor to return our mockAgent
-    Agent: vi.fn().mockImplementation(() => {
+    Agent: vi.fn().mockImplementation(function () {
       // We'll set this in the test
       return global.mockAgentForTest;
     }),
