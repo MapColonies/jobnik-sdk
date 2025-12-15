@@ -121,7 +121,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/stages/${stageType}/tasks/dequeue`,
+            path: `/v1/stages/${stageType}/tasks/dequeue`,
             method: 'PATCH',
           })
           .reply(200, JSON.stringify(mockTaskResponse), {
@@ -136,7 +136,7 @@ describe('Consumer', () => {
       it('should return null when no tasks are available', async () => {
         mockPool
           .intercept({
-            path: `/stages/${stageType}/tasks/dequeue`,
+            path: `/v1/stages/${stageType}/tasks/dequeue`,
             method: 'PATCH',
           })
           .reply(
@@ -164,7 +164,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/stages/image-resize/tasks/dequeue`,
+            path: `/v1/stages/image-resize/tasks/dequeue`,
             method: 'PATCH',
           })
           .reply(200, JSON.stringify(mockTaskResponse), {
@@ -186,7 +186,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/stages/${stageType}/tasks/dequeue`,
+            path: `/v1/stages/${stageType}/tasks/dequeue`,
             method: 'PATCH',
           })
           .reply(500, JSON.stringify(errorResponse), {
@@ -208,7 +208,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/stages/${stageType}/tasks/dequeue`,
+            path: `/v1/stages/${stageType}/tasks/dequeue`,
             method: 'PATCH',
           })
           .reply(400, JSON.stringify(errorResponse), {
@@ -236,7 +236,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}`,
+            path: `/v1/tasks/${taskId}`,
             method: 'GET',
           })
           .reply(200, JSON.stringify(mockTaskResponse), {
@@ -246,7 +246,7 @@ describe('Consumer', () => {
         // Mock PUT /tasks/{taskId}/status for status update
         mockPool
           .intercept({
-            path: `/tasks/${taskId}/status`,
+            path: `/v1/tasks/${taskId}/status`,
             method: 'PUT',
           })
           .reply(200, JSON.stringify({}), {
@@ -266,7 +266,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}`,
+            path: `/v1/tasks/${taskId}`,
             method: 'GET',
           })
           .reply(404, JSON.stringify(errorResponse), {
@@ -289,7 +289,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}`,
+            path: `/v1/tasks/${taskId}`,
             method: 'GET',
           })
           .reply(200, JSON.stringify(mockTaskResponse), {
@@ -319,7 +319,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}`,
+            path: `/v1/tasks/${taskId}`,
             method: 'GET',
           })
           .reply(200, JSON.stringify(mockTaskResponse), {
@@ -334,7 +334,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}/status`,
+            path: `/v1/tasks/${taskId}/status`,
             method: 'PUT',
           })
           .reply(400, JSON.stringify(errorResponse), {
@@ -356,7 +356,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}`,
+            path: `/v1/tasks/${taskId}`,
             method: 'GET',
           })
           .reply(200, JSON.stringify(mockTaskResponse), {
@@ -371,7 +371,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}/status`,
+            path: `/v1/tasks/${taskId}/status`,
             method: 'PUT',
           })
           .reply(400, JSON.stringify(errorResponse), {
@@ -400,7 +400,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}`,
+            path: `/v1/tasks/${taskId}`,
             method: 'GET',
           })
           .reply(200, JSON.stringify(mockTaskResponse), {
@@ -410,7 +410,7 @@ describe('Consumer', () => {
         // Mock PUT /tasks/{taskId}/status for status update
         mockPool
           .intercept({
-            path: `/tasks/${taskId}/status`,
+            path: `/v1/tasks/${taskId}/status`,
             method: 'PUT',
           })
           .reply(200, JSON.stringify({}), {
@@ -430,7 +430,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}`,
+            path: `/v1/tasks/${taskId}`,
             method: 'GET',
           })
           .reply(404, JSON.stringify(errorResponse), {
@@ -453,7 +453,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}`,
+            path: `/v1/tasks/${taskId}`,
             method: 'GET',
           })
           .reply(200, JSON.stringify(mockTaskResponse), {
@@ -483,7 +483,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}`,
+            path: `/v1/tasks/${taskId}`,
             method: 'GET',
           })
           .reply(200, JSON.stringify(mockTaskResponse), {
@@ -498,7 +498,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}/status`,
+            path: `/v1/tasks/${taskId}/status`,
             method: 'PUT',
           })
           .reply(500, JSON.stringify(errorResponse), {
@@ -520,7 +520,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}`,
+            path: `/v1/tasks/${taskId}`,
             method: 'GET',
           })
           .reply(200, JSON.stringify(mockTaskResponse), {
@@ -535,7 +535,7 @@ describe('Consumer', () => {
 
         mockPool
           .intercept({
-            path: `/tasks/${taskId}/status`,
+            path: `/v1/tasks/${taskId}/status`,
             method: 'PUT',
           })
           .reply(400, JSON.stringify(errorResponse), {
@@ -569,7 +569,7 @@ describe('Consumer', () => {
 
       mockPool
         .intercept({
-          path: `/stages/${stageType}/tasks/dequeue`,
+          path: `/v1/stages/${stageType}/tasks/dequeue`,
           method: 'PATCH',
         })
         .reply(200, JSON.stringify(mockTaskResponse), {
@@ -586,7 +586,7 @@ describe('Consumer', () => {
       // Mock GET /tasks/{taskId} for task retrieval in completion
       mockPool
         .intercept({
-          path: `/tasks/${taskId}`,
+          path: `/v1/tasks/${taskId}`,
           method: 'GET',
         })
         .reply(200, JSON.stringify(mockTaskResponse), {
@@ -596,7 +596,7 @@ describe('Consumer', () => {
       // Mock PUT /tasks/{taskId}/status for completion
       mockPool
         .intercept({
-          path: `/tasks/${taskId}/status`,
+          path: `/v1/tasks/${taskId}/status`,
           method: 'PUT',
         })
         .reply(200, JSON.stringify({}), {
@@ -635,7 +635,7 @@ describe('Consumer', () => {
 
       mockPool
         .intercept({
-          path: `/stages/${stageType}/tasks/dequeue`,
+          path: `/v1/stages/${stageType}/tasks/dequeue`,
           method: 'PATCH',
         })
         .reply(200, JSON.stringify(mockTaskResponse), {
@@ -651,7 +651,7 @@ describe('Consumer', () => {
       // Mock GET /tasks/{taskId} for task retrieval in failure marking
       mockPool
         .intercept({
-          path: `/tasks/${taskId}`,
+          path: `/v1/tasks/${taskId}`,
           method: 'GET',
         })
         .reply(200, JSON.stringify(mockTaskResponse), {
@@ -661,7 +661,7 @@ describe('Consumer', () => {
       // Mock PUT /tasks/{taskId}/status for failure marking
       mockPool
         .intercept({
-          path: `/tasks/${taskId}/status`,
+          path: `/v1/tasks/${taskId}/status`,
           method: 'PUT',
         })
         .reply(200, JSON.stringify({}), {
@@ -688,7 +688,7 @@ describe('Consumer', () => {
       // Mock empty queue
       mockPool
         .intercept({
-          path: `/stages/${stageType}/tasks/dequeue`,
+          path: `/v1/stages/${stageType}/tasks/dequeue`,
           method: 'PATCH',
         })
         .reply(
@@ -718,7 +718,7 @@ describe('Consumer', () => {
 
       mockPool
         .intercept({
-          path: '/stages/image-resize/tasks/dequeue',
+          path: '/v1/stages/image-resize/tasks/dequeue',
           method: 'PATCH',
         })
         .reply(200, JSON.stringify(mockImageTask), {

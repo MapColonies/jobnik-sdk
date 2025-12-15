@@ -89,7 +89,7 @@ describe('apiClient tracing', () => {
     });
     const spans = memoryExporter.getFinishedSpans();
 
-    expect(spans[0]).toHaveProperty(['attributes', 'api.operation_id'], 'findJobs');
+    expect(spans[0]).toHaveProperty(['attributes', 'api.operation_id'], 'findJobsV1');
   });
 
   it('should create a span for the API call when using the request method', async () => {
@@ -130,7 +130,7 @@ describe('apiClient tracing', () => {
 
   it('should set the span status to ERROR on 4xx response', async () => {
     expect.assertions(1);
-    mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(400, 'BadRequest');
+    mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).reply(400, 'BadRequest');
     await tracer.startActiveSpan('Test Span', async (span) => {
       try {
         await apiClient.GET('/v1/jobs');
@@ -149,7 +149,7 @@ describe('apiClient tracing', () => {
 
   it('should set the span status to ERROR on 5xx response', async () => {
     expect.assertions(1);
-    mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(500, 'Internal Server Error');
+    mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).reply(500, 'Internal Server Error');
     await tracer.startActiveSpan('Test Span', async (span) => {
       try {
         await apiClient.GET('/v1/jobs');

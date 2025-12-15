@@ -67,11 +67,11 @@ describe('API Client Error Handling Middleware', () => {
       describe('400 Bad Request', () => {
         it('should return the error and not throw', async () => {
           const errorResponse = { message: 'Invalid job parameters' };
-          mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(400, JSON.stringify(errorResponse), {
+          mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).reply(400, JSON.stringify(errorResponse), {
             headers: { 'content-type': 'application/json' },
           });
 
-          const reqPromise = apiClient.GET('/jobs');
+          const reqPromise = apiClient.GET('/v1/jobs');
 
           await expect(reqPromise).resolves.not.toThrow();
           await expect(reqPromise).resolves.toHaveProperty('error');
@@ -83,11 +83,11 @@ describe('API Client Error Handling Middleware', () => {
           const jobId = '123e4567-e89b-12d3-a456-426614174000' as JobId;
           const errorResponse = { message: 'Job not found' };
 
-          mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(404, JSON.stringify(errorResponse), {
+          mockPool.intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' }).reply(404, JSON.stringify(errorResponse), {
             headers: { 'content-type': 'application/json' },
           });
 
-          const reqPromise = apiClient.GET('/jobs/{jobId}', { params: { path: { jobId } } });
+          const reqPromise = apiClient.GET('/v1/jobs/{jobId}', { params: { path: { jobId } } });
 
           await expect(reqPromise).resolves.not.toThrow();
           await expect(reqPromise).resolves.toHaveProperty('error');
@@ -98,11 +98,11 @@ describe('API Client Error Handling Middleware', () => {
         it('should return the error and not throw', async () => {
           const errorResponse = { message: 'Database connection failed' };
 
-          mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(500, JSON.stringify(errorResponse), {
+          mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).reply(500, JSON.stringify(errorResponse), {
             headers: { 'content-type': 'application/json' },
           });
 
-          const reqPromise = apiClient.GET('/jobs');
+          const reqPromise = apiClient.GET('/v1/jobs');
 
           await expect(reqPromise).resolves.not.toThrow();
           await expect(reqPromise).resolves.toHaveProperty('error');
@@ -113,108 +113,106 @@ describe('API Client Error Handling Middleware', () => {
     describe('Infrastructure Errors', () => {
       it('should throw BadGatewayError for 502 Bad Gateway', async () => {
         // Set up the mock to respond with the same error for all requests (handles retries)
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(502, 'Bad Gateway').persist();
+        mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).reply(502, 'Bad Gateway').persist();
 
-        const reqPromise = apiClient.GET('/jobs');
+        const reqPromise = apiClient.GET('/v1/jobs');
 
         await expect(reqPromise).rejects.toThrow(APIError);
-        await expect(reqPromise).rejects.toThrow('Service temporarily unavailable for GET http://localhost:8080/jobs. Please retry later.');
+        await expect(reqPromise).rejects.toThrow('Service temporarily unavailable for GET http://localhost:8080/v1/jobs. Please retry later.');
       });
 
       it('should throw ServiceUnavailableError for 503 Service Unavailable', async () => {
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(503, 'Service Unavailable').persist();
-
-        const reqPromise = apiClient.GET('/jobs');
+        mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).reply(503, 'Service Unavailable').persist();
+        const reqPromise = apiClient.GET('/v1/jobs');
 
         await expect(reqPromise).rejects.toThrow(APIError);
-        await expect(reqPromise).rejects.toThrow('Service temporarily unavailable for GET http://localhost:8080/jobs. Please retry later.');
+        await expect(reqPromise).rejects.toThrow('Service temporarily unavailable for GET http://localhost:8080/v1/jobs. Please retry later.');
       });
 
       it('should throw GatewayTimeoutError for 504 Gateway Timeout', async () => {
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(504, 'Gateway Timeout').persist();
-
-        const reqPromise = apiClient.GET('/jobs');
+        mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).reply(504, 'Gateway Timeout').persist();
+        const reqPromise = apiClient.GET('/v1/jobs');
 
         await expect(reqPromise).rejects.toThrow(APIError);
-        await expect(reqPromise).rejects.toThrow('Service temporarily unavailable for GET http://localhost:8080/jobs. Please retry later.');
+        await expect(reqPromise).rejects.toThrow('Service temporarily unavailable for GET http://localhost:8080/v1/jobs. Please retry later.');
       });
     });
 
     describe('Network Error Handling', () => {
       it('should throw NetworkError for connection refused', async () => {
         const connectionError = new TypeError('fetch failed: ECONNREFUSED');
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(connectionError).persist();
+        mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).replyWithError(connectionError).persist();
 
-        const reqPromise = apiClient.GET('/jobs');
+        const reqPromise = apiClient.GET('/v1/jobs');
 
         await expect(reqPromise).rejects.toThrow(NetworkError);
-        await expect(reqPromise).rejects.toThrow('Failed to connect to http://localhost:8080/jobs: Connection refused');
+        await expect(reqPromise).rejects.toThrow('Failed to connect to http://localhost:8080/v1/jobs: Connection refused');
       });
 
       it('should throw NetworkError for timeout', async () => {
         const timeoutError = new TypeError('fetch failed: ETIMEDOUT');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(timeoutError).persist();
+        mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).replyWithError(timeoutError).persist();
 
-        const reqPromise = apiClient.GET('/jobs');
+        const reqPromise = apiClient.GET('/v1/jobs');
 
         await expect(reqPromise).rejects.toThrow(NetworkError);
-        await expect(reqPromise).rejects.toThrow('Request to http://localhost:8080/jobs timed out');
+        await expect(reqPromise).rejects.toThrow('Request to http://localhost:8080/v1/jobs timed out');
       });
 
       it('should throw NetworkError for DNS resolution failure', async () => {
         const dnsError = new TypeError('fetch failed: ENOTFOUND');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(dnsError).persist();
+        mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).replyWithError(dnsError).persist();
 
-        const reqPromise = apiClient.GET('/jobs');
+        const reqPromise = apiClient.GET('/v1/jobs');
 
         await expect(reqPromise).rejects.toThrow(NetworkError);
-        await expect(reqPromise).rejects.toThrow('DNS resolution failed for http://localhost:8080/jobs');
+        await expect(reqPromise).rejects.toThrow('DNS resolution failed for http://localhost:8080/v1/jobs');
       });
 
       it('should throw NetworkError for host unreachable', async () => {
         const hostError = new TypeError('fetch failed: EHOSTUNREACH');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(hostError).persist();
+        mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).replyWithError(hostError).persist();
 
-        const reqPromise = apiClient.GET('/jobs');
+        const reqPromise = apiClient.GET('/v1/jobs');
 
         await expect(reqPromise).rejects.toThrow(NetworkError);
-        await expect(reqPromise).rejects.toThrow('Host unreachable: http://localhost:8080/jobs');
+        await expect(reqPromise).rejects.toThrow('Host unreachable: http://localhost:8080/v1/jobs');
       });
 
       it('should throw NetworkError for SSL/TLS errors', async () => {
         const sslError = new TypeError('fetch failed: SSL certificate error');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(sslError).persist();
+        mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).replyWithError(sslError).persist();
 
-        const reqPromise = apiClient.GET('/jobs');
+        const reqPromise = apiClient.GET('/v1/jobs');
 
         await expect(reqPromise).rejects.toThrow(NetworkError);
-        await expect(reqPromise).rejects.toThrow('SSL/TLS error when connecting to http://localhost:8080/jobs');
+        await expect(reqPromise).rejects.toThrow('SSL/TLS error when connecting to http://localhost:8080/v1/jobs');
       });
 
       it('should throw NetworkError for AbortError', async () => {
         const abortError = new DOMException('This operation was aborted', 'AbortError');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(abortError).persist();
+        mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).replyWithError(abortError).persist();
 
-        const reqPromise = apiClient.GET('/jobs');
+        const reqPromise = apiClient.GET('/v1/jobs');
 
         await expect(reqPromise).rejects.toThrow(NetworkError);
-        await expect(reqPromise).rejects.toThrow('Request to GET http://localhost:8080/jobs was aborted');
+        await expect(reqPromise).rejects.toThrow('Request to GET http://localhost:8080/v1/jobs was aborted');
       });
 
       it('should throw NetworkError for unknown network errors', async () => {
         const unknownError = new TypeError('fetch failed: Unknown network error');
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).replyWithError(unknownError);
+        mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).replyWithError(unknownError);
 
-        const reqPromise = apiClient.GET('/jobs');
+        const reqPromise = apiClient.GET('/v1/jobs');
 
         await expect(reqPromise).rejects.toThrow(NetworkError);
-        await expect(reqPromise).rejects.toThrow('Network error when requesting GET http://localhost:8080/jobs: fetch failed');
+        await expect(reqPromise).rejects.toThrow('Network error when requesting GET http://localhost:8080/v1/jobs: fetch failed');
       });
     });
 
@@ -222,20 +220,20 @@ describe('API Client Error Handling Middleware', () => {
       it('should not trigger error middleware for 200 responses', async () => {
         const successResponse = { jobs: [] };
 
-        mockPool.intercept({ path: '/jobs', method: 'GET' }).reply(200, JSON.stringify(successResponse), {
+        mockPool.intercept({ path: '/v1/jobs', method: 'GET' }).reply(200, JSON.stringify(successResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
-        const response = await apiClient.GET('/jobs');
+        const response = await apiClient.GET('/v1/jobs');
 
         expect(response.error).toBeUndefined();
         expect(response.data).toEqual(successResponse);
       });
 
       it('should not trigger error middleware for 204 responses', async () => {
-        mockPool.intercept({ path: '/jobs/123', method: 'DELETE' }).reply(204, '');
+        mockPool.intercept({ path: '/v1/jobs/123', method: 'DELETE' }).reply(204, '');
 
-        const response = await apiClient.DELETE('/jobs/{jobId}', { params: { path: { jobId: '123' as JobId } } });
+        const response = await apiClient.DELETE('/v1/jobs/{jobId}', { params: { path: { jobId: '123' as JobId } } });
 
         expect(response.error).toBeUndefined();
         expect(response.response.status).toBe(204);
