@@ -4,7 +4,7 @@
 
 import type { JobId, StageId, TaskId } from './brands';
 export type paths = {
-  '/jobs': {
+  '/v1/jobs': {
     parameters: {
       query?: never;
       header?: never;
@@ -12,33 +12,26 @@ export type paths = {
       cookie?: never;
     };
     /**
-     * Retrieve jobs matching specified criteria
-     * @description Returns a filtered list of jobs based on the provided query parameters.
-     *     Supports filtering by job mode, name, date range, priority.
-     *     Optional inclusion of related stage data via the should_return_stages parameter.
-     *
-     *     Returns an empty array ([]) when no jobs match the specified criteria, rather than an error.
+     * Retrieve jobs matching criteria
+     * @description Filter jobs by name, date range, priority. Optional stage inclusion.
+     *     Returns empty array if no matches.
      *
      */
-    get: operations['findJobs'];
+    get: operations['findJobsV1'];
     put?: never;
     /**
-     * Create a new job with configuration and metadata
-     * @description Creates a new job in the system with user-defined configuration and metadata.
-     *     Supports customizable priorities and job-specific data payloads.
-     *
-     *     The job will be created with an initial status of CREATED and can be tracked
-     *     throughout its lifecycle using the returned job ID.
+     * Create job
+     * @description Create job with config and metadata. Initial status: PENDING.
      *
      */
-    post: operations['createJob'];
+    post: operations['createJobV1'];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  '/jobs/{jobId}': {
+  '/v1/jobs/{jobId}': {
     parameters: {
       query?: never;
       header?: never;
@@ -57,7 +50,7 @@ export type paths = {
      *     which allows clients to retrieve the complete job hierarchy in a single request.
      *
      */
-    get: operations['getJobById'];
+    get: operations['getJobByIdV1'];
     put?: never;
     post?: never;
     /**
@@ -72,13 +65,13 @@ export type paths = {
      *     Returns a success message with code JOB_DELETED_SUCCESSFULLY when completed.
      *
      */
-    delete: operations['deleteJob'];
+    delete: operations['deleteJobV1'];
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  '/jobs/{jobId}/user-metadata': {
+  '/v1/jobs/{jobId}/user-metadata': {
     parameters: {
       query?: never;
       header?: never;
@@ -101,10 +94,10 @@ export type paths = {
      *     or any custom data needed by client applications.
      *
      */
-    patch: operations['updateUserMetadata'];
+    patch: operations['updateUserMetadataV1'];
     trace?: never;
   };
-  '/jobs/{jobId}/priority': {
+  '/v1/jobs/{jobId}/priority': {
     parameters: {
       query?: never;
       header?: never;
@@ -130,10 +123,10 @@ export type paths = {
      *     pending tasks associated with the job.
      *
      */
-    patch: operations['updateJobPriority'];
+    patch: operations['updateJobPriorityV1'];
     trace?: never;
   };
-  '/jobs/{jobId}/status': {
+  '/v1/jobs/{jobId}/status': {
     parameters: {
       query?: never;
       header?: never;
@@ -145,20 +138,21 @@ export type paths = {
     };
     get?: never;
     /**
-     * Change job's operational status
-     * @description Updates the operational status of a job, which may cascade changes to all
-     *     related stages and tasks. This endpoint can be used to pause, resume, abort,
-     *     or otherwise control the execution flow of a job.
+     * Update job status for workflow control
+     * @description Updates the operational status of a job to control its workflow execution. This endpoint
+     *     supports user-initiated operations including PENDING (resume), ABORTED (cancel), and
+     *     PAUSED (suspend), which may cascade changes to related stages and tasks.
      *
-     *     Status changes follow a state machine that enforces valid transitions, preventing
-     *     operations like resuming a completed job or completing a failed job without
-     *     proper remediation.
+     *     Internal status transitions (such as IN_PROGRESS, COMPLETED, FAILED, CREATED) are managed
+     *     automatically by the system based on stage and task completion, and cannot be set through
+     *     this endpoint.
      *
-     *     When a job's status is changed, the system will automatically update timestamps
-     *     and completion percentages as appropriate.
+     *     Status changes follow a state machine that enforces valid transitions. When a job's status
+     *     is changed, the system will automatically update timestamps and completion percentages as
+     *     appropriate.
      *
      */
-    put: operations['updateStatus'];
+    put: operations['updateStatusV1'];
     post?: never;
     delete?: never;
     options?: never;
@@ -166,7 +160,7 @@ export type paths = {
     patch?: never;
     trace?: never;
   };
-  '/jobs/{jobId}/stages': {
+  '/v1/jobs/{jobId}/stages': {
     parameters: {
       query?: never;
       header?: never;
@@ -189,7 +183,7 @@ export type paths = {
      *     allowing clients to retrieve the complete job hierarchy in a single request.
      *
      */
-    get: operations['getStagesByJobId'];
+    get: operations['getStagesByJobIdV1'];
     put?: never;
     post?: never;
     delete?: never;
@@ -198,7 +192,7 @@ export type paths = {
     patch?: never;
     trace?: never;
   };
-  '/jobs/{jobId}/stage': {
+  '/v1/jobs/{jobId}/stage': {
     parameters: {
       query?: never;
       header?: never;
@@ -220,14 +214,14 @@ export type paths = {
      *     The job must exist and be in a valid state to accept new stages.
      *
      */
-    post: operations['addStage'];
+    post: operations['addStageV1'];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  '/stages': {
+  '/v1/stages': {
     parameters: {
       query?: never;
       header?: never;
@@ -243,7 +237,7 @@ export type paths = {
      *     allows clients to retrieve the complete stage hierarchy in a single request.
      *
      */
-    get: operations['getStages'];
+    get: operations['getStagesV1'];
     put?: never;
     post?: never;
     delete?: never;
@@ -252,7 +246,7 @@ export type paths = {
     patch?: never;
     trace?: never;
   };
-  '/stages/{stageId}': {
+  '/v1/stages/{stageId}': {
     parameters: {
       query?: never;
       header?: never;
@@ -271,7 +265,7 @@ export type paths = {
      *     which allows clients to retrieve the complete stage hierarchy in a single request.
      *
      */
-    get: operations['getStageById'];
+    get: operations['getStageByIdV1'];
     put?: never;
     post?: never;
     delete?: never;
@@ -280,7 +274,7 @@ export type paths = {
     patch?: never;
     trace?: never;
   };
-  '/stages/{stageId}/summary': {
+  '/v1/stages/{stageId}/summary': {
     parameters: {
       query?: never;
       header?: never;
@@ -297,7 +291,7 @@ export type paths = {
      *     without needing to retrieve and process all individual task details.
      *
      */
-    get: operations['getStageSummary'];
+    get: operations['getStageSummaryV1'];
     put?: never;
     post?: never;
     delete?: never;
@@ -306,7 +300,7 @@ export type paths = {
     patch?: never;
     trace?: never;
   };
-  '/stages/{stageId}/user-metadata': {
+  '/v1/stages/{stageId}/user-metadata': {
     parameters: {
       query?: never;
       header?: never;
@@ -329,10 +323,10 @@ export type paths = {
      *     or any custom data needed by client applications.
      *
      */
-    patch: operations['updateStageUserMetadata'];
+    patch: operations['updateStageUserMetadataV1'];
     trace?: never;
   };
-  '/stages/{stageId}/status': {
+  '/v1/stages/{stageId}/status': {
     parameters: {
       query?: never;
       header?: never;
@@ -341,20 +335,25 @@ export type paths = {
     };
     get?: never;
     /**
-     * Change stage's operational status
-     * @description Updates the operational status of a stage, which may cascade changes to all
-     *     related tasks. This endpoint can be used to pause, resume, abort, or otherwise
-     *     control the execution flow of a stage.
+     * Update stage status to trigger workflow progression
+     * @description Updates the operational status of a stage to PENDING, which may trigger workflow
+     *     transitions and cascade changes to related tasks and the parent job. This endpoint
+     *     is restricted to manually advancing stages in the workflow sequence.
      *
-     *     Status changes follow a state machine that enforces valid transitions, preventing
-     *     operations like resuming a completed stage or completing a failed stage without
-     *     proper remediation.
+     *     Common use cases:
+     *     - Resuming a WAITING stage (e.g., after manual intervention or approval)
+     *     - Unblocking workflow progression when a stage is ready to proceed
      *
-     *     Changes to a stage's status may affect the parent job's status if certain
-     *     conditions are met.
+     *     Internal status transitions (such as IN_PROGRESS, COMPLETED, FAILED, ABORTED,
+     *     WAITING, CREATED) are managed automatically by the system based on task completion,
+     *     job state, and workflow rules.
+     *
+     *     Status changes follow a state machine that enforces valid transitions. When a stage's
+     *     status changes, it may automatically update the parent job's status and trigger
+     *     transitions in subsequent stages (e.g., activating the next stage in the sequence).
      *
      */
-    put: operations['updateStageStatus'];
+    put: operations['updateStageStatusV1'];
     post?: never;
     delete?: never;
     options?: never;
@@ -362,7 +361,7 @@ export type paths = {
     patch?: never;
     trace?: never;
   };
-  '/stages/{stageId}/tasks': {
+  '/v1/stages/{stageId}/tasks': {
     parameters: {
       query?: never;
       header?: never;
@@ -378,7 +377,7 @@ export type paths = {
      *     Provides complete information about each task including type, status, and attempt count.
      *
      */
-    get: operations['getTasksByStageId'];
+    get: operations['getTasksByStageIdV1'];
     put?: never;
     /**
      * Add new tasks to an existing stage
@@ -391,14 +390,14 @@ export type paths = {
      *     The stage must exist and be in a valid state to accept new tasks.
      *
      */
-    post: operations['addTasks'];
+    post: operations['addTasksV1'];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  '/stages/{stageType}/tasks/dequeue': {
+  '/v1/stages/{stageType}/tasks/dequeue': {
     parameters: {
       query?: never;
       header?: never;
@@ -426,10 +425,10 @@ export type paths = {
      *     If successful, returns the complete task details with status updated to IN_PROGRESS.
      *
      */
-    patch: operations['dequeueTask'];
+    patch: operations['dequeueTaskV1'];
     trace?: never;
   };
-  '/tasks': {
+  '/v1/tasks': {
     parameters: {
       query?: {
         /** @description Filter results by stage identifier */
@@ -456,7 +455,7 @@ export type paths = {
      *     enabling clients to build custom dashboards or track specific task types.
      *
      */
-    get: operations['getTasksByCriteria'];
+    get: operations['getTasksByCriteriaV1'];
     put?: never;
     post?: never;
     delete?: never;
@@ -465,7 +464,7 @@ export type paths = {
     patch?: never;
     trace?: never;
   };
-  '/tasks/{taskId}': {
+  '/v1/tasks/{taskId}': {
     parameters: {
       query?: never;
       header?: never;
@@ -481,7 +480,7 @@ export type paths = {
      *     Returns complete task data including type, status, payload, and attempt information.
      *
      */
-    get: operations['getTaskById'];
+    get: operations['getTaskByIdV1'];
     put?: never;
     post?: never;
     delete?: never;
@@ -490,7 +489,7 @@ export type paths = {
     patch?: never;
     trace?: never;
   };
-  '/tasks/{taskId}/user-metadata': {
+  '/v1/tasks/{taskId}/user-metadata': {
     parameters: {
       query?: never;
       header?: never;
@@ -513,10 +512,10 @@ export type paths = {
      *     or any custom data needed by client applications.
      *
      */
-    patch: operations['updateTaskUserMetadata'];
+    patch: operations['updateTaskUserMetadataV1'];
     trace?: never;
   };
-  '/tasks/{taskId}/status': {
+  '/v1/tasks/{taskId}/status': {
     parameters: {
       query?: never;
       header?: never;
@@ -528,19 +527,20 @@ export type paths = {
     };
     get?: never;
     /**
-     * Change task's operational status
-     * @description Updates the operational status of a task, which may trigger cascading updates
-     *     to the parent stage and job. This endpoint can be used to mark tasks as complete,
-     *     failed, aborted, or otherwise control the execution flow.
+     * Mark task as completed or failed
+     * @description Updates the operational status of a task to either COMPLETED or FAILED, which may trigger
+     *     cascading updates to the parent stage and job. This endpoint is restricted to marking tasks
+     *     as finished by external workers.
      *
-     *     Status changes follow a state machine that enforces valid transitions, preventing
-     *     operations like completing a paused task without proper resumption.
+     *     Internal status transitions (such as PENDING to IN_PROGRESS) are managed automatically
+     *     by the system through the dequeue operation and cannot be set through this endpoint.
      *
-     *     When a task's status is changed, the system will automatically update the parent stage's
-     *     summary statistics and may affect the stage's overall status.
+     *     Status changes follow a state machine that enforces valid transitions. When a task's status
+     *     is changed, the system will automatically update the parent stage's summary statistics and
+     *     may affect the stage's overall status.
      *
      */
-    put: operations['updateTaskStatus'];
+    put: operations['updateTaskStatusV1'];
     post?: never;
     delete?: never;
     options?: never;
@@ -562,6 +562,16 @@ export type components = {
      * @description Timestamp indicating when the resource was last updated
      */
     updateTime: string;
+    /**
+     * Format: date-time
+     * @description Timestamp indicating when the resource began processing (in-progress state)
+     */
+    startTime: string;
+    /**
+     * Format: date-time
+     * @description Timestamp indicating when the resource reached a finite state (e.g., COMPLETED, FAILED, ABORTED)
+     */
+    endTime: string;
     /**
      * Format: uuid
      * @description Unique identifier for a job
@@ -587,76 +597,85 @@ export type components = {
       [key: string]: unknown;
     };
     /**
-     * @description Sequential order number of the stage within its job, used for maintaining execution sequence
+     * @description Stage execution order within job
      * @example 1
      */
     order: number;
     /**
-     * @description Priority level that determines the relative importance of the job for processing order.
-     *     Higher priority jobs are processed before lower priority ones when system resources
-     *     are constrained. Priority affects task dequeuing order and scheduling decisions.
-     *
-     *     Priority levels from highest to lowest:
-     *     - VERY_HIGH: Critical jobs requiring immediate processing
-     *     - HIGH: Important jobs with elevated priority
-     *     - MEDIUM: Standard priority for regular operations
-     *     - LOW: Non-urgent jobs that can be delayed
-     *     - VERY_LOW: Background jobs with minimal priority
+     * @description Job priority for processing order. Higher priority processed first.
+     *     VERY_HIGH > HIGH > MEDIUM > LOW > VERY_LOW
      *
      * @example LOW
      * @enum {string}
      */
     priority: 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW' | 'VERY_LOW';
     /**
-     * @description Traceparent identifier for distributed tracing.
-     *     When creating resources, this field is optional - if not provided, the system will automatically inject
-     *     both traceparent and tracestate from the active OpenTelemetry context using propagation.inject().
-     *     In response objects, this field is always present and required.
-     *     See the [official W3C Trace Context documentation](https://www.w3.org/TR/trace-context/).
+     * @description W3C traceparent for distributed tracing. Auto-injected if not provided.
+     *     See [W3C Trace Context](https://www.w3.org/TR/trace-context/).
      *
      * @example 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
      */
     traceparent: string;
     /**
-     * @description Tracestate identifier for distributed tracing (optional, can be null).
-     *     When creating resources without providing traceparent, the system will attempt to inject
-     *     tracestate from the active OpenTelemetry context, but it may still be null if not available in the context.
-     *
+     * @description W3C tracestate for distributed tracing. Optional, auto-injected if available.
      * @example rojo=00f067aa0ba902b7,congo=t61rcWkgMzE
      */
     tracestate: string;
     /**
-     * @description Standard success message codes used in API responses
+     * @description Success response codes
      * @example JOB_MODIFIED_SUCCESSFULLY
      * @enum {string}
      */
     successMessages: 'JOB_MODIFIED_SUCCESSFULLY' | 'TASK_MODIFIED_SUCCESSFULLY' | 'STAGE_MODIFIED_SUCCESSFULLY' | 'JOB_DELETED_SUCCESSFULLY';
     /**
-     * @description Execution state of a stage within a job's workflow, tracking progress through its lifecycle.
-     *     Finite states from which no further transitions are possible include: COMPLETED, FAILED, and ABORTED.
+     * @description User-controllable job statuses: PENDING (resume), ABORTED (cancel), PAUSED (suspend).
+     *     System-managed: IN_PROGRESS, COMPLETED, FAILED, CREATED.
      *
-     * @example CREATED
+     * @example PENDING
      * @enum {string}
      */
-    jobOperationStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABORTED' | 'PAUSED' | 'CREATED';
+    jobOperationStatus: 'PENDING' | 'ABORTED' | 'PAUSED';
     /**
-     * @description Execution state of a stage within a job's workflow, tracking progress through its lifecycle.
-     *     Finite states from which no further transitions are possible include: COMPLETED, FAILED, and ABORTED.
+     * @description All job states. User-controllable: PENDING, ABORTED, PAUSED. System-managed: IN_PROGRESS, COMPLETED, FAILED, CREATED.
+     *     Terminal states: COMPLETED, FAILED, ABORTED.
      *
-     * @example CREATED
+     * @example PENDING
      * @enum {string}
      */
-    stageOperationStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABORTED' | 'WAITING' | 'CREATED';
+    jobOperationStatusResponse: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABORTED' | 'PAUSED' | 'CREATED';
     /**
-     * @description Current operational state of a task, including specialized states like RETRIED for task-specific error handling.
-     *     Finite states from which no further transitions are possible include: COMPLETED and FAILED.
+     * @description User-controllable stage status: PENDING only.
+     *     System-managed: IN_PROGRESS, COMPLETED, FAILED, ABORTED, WAITING, CREATED.
      *
-     * @example CREATED
      * @enum {string}
      */
-    taskOperationStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CREATED' | 'RETRIED';
+    stageOperationStatus: 'PENDING';
     /**
-     * @description Category or type of job processing being performed, used for filtering and system behaviors
+     * @description All stage states. User-controllable: PENDING. System-managed: IN_PROGRESS, COMPLETED, FAILED, ABORTED, WAITING, CREATED.
+     *     Terminal states: COMPLETED, FAILED, ABORTED.
+     *
+     * @example PENDING
+     * @enum {string}
+     */
+    stageOperationStatusResponse: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'ABORTED' | 'WAITING' | 'CREATED';
+    /**
+     * @description User-controllable task statuses: COMPLETED, FAILED.
+     *     System-managed: PENDING, IN_PROGRESS, CREATED, RETRIED.
+     *
+     * @example COMPLETED
+     * @enum {string}
+     */
+    taskOperationStatus: 'COMPLETED' | 'FAILED';
+    /**
+     * @description All task states including RETRIED for retry handling.
+     *     Terminal states: COMPLETED, FAILED.
+     *
+     * @example PENDING
+     * @enum {string}
+     */
+    taskOperationStatusResponse: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CREATED' | 'RETRIED';
+    /**
+     * @description Job category/type for filtering and behavior
      * @example DEFAULT
      */
     jobName: string;
@@ -727,13 +746,13 @@ export type components = {
      *      */
     job: {
       id: components['schemas']['jobId'];
-      status?: components['schemas']['jobOperationStatus'];
-      percentage?: components['schemas']['percentage'];
-      creationTime?: components['schemas']['creationTime'];
-      updateTime?: components['schemas']['updateTime'];
+      status: components['schemas']['jobOperationStatusResponse'];
+      percentage: components['schemas']['percentage'];
+      creationTime: components['schemas']['creationTime'];
+      updateTime: components['schemas']['updateTime'];
       name: components['schemas']['jobName'];
       data: components['schemas']['jobPayload'];
-      priority?: components['schemas']['priority'];
+      priority: components['schemas']['priority'];
       userMetadata: components['schemas']['userMetadata'];
       traceparent: components['schemas']['traceparent'];
       tracestate?: components['schemas']['tracestate'];
@@ -768,8 +787,8 @@ export type components = {
     stageResponse: components['schemas']['createStagePayload'] & {
       id: components['schemas']['stageId'];
       summary: components['schemas']['summary'];
-      percentage?: components['schemas']['percentage'];
-      status?: components['schemas']['stageOperationStatus'];
+      percentage: components['schemas']['percentage'];
+      status: components['schemas']['stageOperationStatusResponse'];
       jobId: components['schemas']['jobId'];
       order: components['schemas']['order'];
       traceparent: components['schemas']['traceparent'];
@@ -814,10 +833,12 @@ export type components = {
       id: components['schemas']['taskId'];
       data: components['schemas']['taskPayload'];
       stageId: components['schemas']['stageId'];
-      userMetadata?: components['schemas']['userMetadata'];
-      creationTime?: components['schemas']['creationTime'];
-      updateTime?: components['schemas']['updateTime'];
-      status: components['schemas']['taskOperationStatus'];
+      userMetadata: components['schemas']['userMetadata'];
+      creationTime: components['schemas']['creationTime'];
+      updateTime: components['schemas']['updateTime'];
+      startTime?: components['schemas']['startTime'];
+      endTime?: components['schemas']['endTime'];
+      status: components['schemas']['taskOperationStatusResponse'];
       attempts: components['schemas']['attempts'];
       maxAttempts: components['schemas']['maxAttempts'];
       traceparent: components['schemas']['traceparent'];
@@ -869,7 +890,7 @@ export type components = {
     /** @description Unique identifier for the task */
     taskId: components['schemas']['taskId'];
     /** @description Filter tasks by their operational status */
-    paramsTaskStatus: components['schemas']['taskOperationStatus'];
+    paramsTaskStatus: components['schemas']['taskOperationStatusResponse'];
     /** @description Filter jobs by their name/type */
     jobNameQueryParam: components['schemas']['jobName'];
     /** @description Filter jobs by their priority level */
@@ -893,7 +914,7 @@ export type components = {
     /** @description Filter results by stage operational status (e.g., PENDING, IN_PROGRESS).
      *     Used to find stages in specific execution states.
      *      */
-    stageStatus: components['schemas']['stageOperationStatus'];
+    stageStatus: components['schemas']['stageOperationStatusResponse'];
   };
   requestBodies: never;
   headers: never;
@@ -901,7 +922,7 @@ export type components = {
 };
 export type $defs = Record<string, never>;
 export interface operations {
-  findJobs: {
+  findJobsV1: {
     parameters: {
       query?: {
         /** @description Filter jobs by their name/type */
@@ -950,7 +971,7 @@ export interface operations {
       };
     };
   };
-  createJob: {
+  createJobV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -992,7 +1013,7 @@ export interface operations {
       };
     };
   };
-  getJobById: {
+  getJobByIdV1: {
     parameters: {
       query?: {
         /** @description When true, includes stage data in the response */
@@ -1045,7 +1066,7 @@ export interface operations {
       };
     };
   };
-  deleteJob: {
+  deleteJobV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1101,7 +1122,7 @@ export interface operations {
       };
     };
   };
-  updateUserMetadata: {
+  updateUserMetadataV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1158,7 +1179,7 @@ export interface operations {
       };
     };
   };
-  updateJobPriority: {
+  updateJobPriorityV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1226,7 +1247,7 @@ export interface operations {
       };
     };
   };
-  updateStatus: {
+  updateStatusV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1288,7 +1309,7 @@ export interface operations {
       };
     };
   };
-  getStagesByJobId: {
+  getStagesByJobIdV1: {
     parameters: {
       query?: {
         /** @description When true, includes task data in the response */
@@ -1341,7 +1362,7 @@ export interface operations {
       };
     };
   };
-  addStage: {
+  addStageV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1398,7 +1419,7 @@ export interface operations {
       };
     };
   };
-  getStages: {
+  getStagesV1: {
     parameters: {
       query?: {
         /** @description Filter results by job identifier */
@@ -1447,7 +1468,7 @@ export interface operations {
       };
     };
   };
-  getStageById: {
+  getStageByIdV1: {
     parameters: {
       query?: {
         /** @description When true, includes task data in the response */
@@ -1500,7 +1521,7 @@ export interface operations {
       };
     };
   };
-  getStageSummary: {
+  getStageSummaryV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1550,7 +1571,7 @@ export interface operations {
       };
     };
   };
-  updateStageUserMetadata: {
+  updateStageUserMetadataV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1607,7 +1628,7 @@ export interface operations {
       };
     };
   };
-  updateStageStatus: {
+  updateStageStatusV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1672,7 +1693,7 @@ export interface operations {
       };
     };
   };
-  getTasksByStageId: {
+  getTasksByStageIdV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1722,7 +1743,7 @@ export interface operations {
       };
     };
   };
-  addTasks: {
+  addTasksV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1779,7 +1800,7 @@ export interface operations {
       };
     };
   };
-  dequeueTask: {
+  dequeueTaskV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1840,7 +1861,7 @@ export interface operations {
       };
     };
   };
-  getTasksByCriteria: {
+  getTasksByCriteriaV1: {
     parameters: {
       query?: {
         /** @description Filter results by stage identifier */
@@ -1889,7 +1910,7 @@ export interface operations {
       };
     };
   };
-  getTaskById: {
+  getTaskByIdV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1939,7 +1960,7 @@ export interface operations {
       };
     };
   };
-  updateTaskUserMetadata: {
+  updateTaskUserMetadataV1: {
     parameters: {
       query?: never;
       header?: never;
@@ -1996,7 +2017,7 @@ export interface operations {
       };
     };
   };
-  updateTaskStatus: {
+  updateTaskStatusV1: {
     parameters: {
       query?: never;
       header?: never;

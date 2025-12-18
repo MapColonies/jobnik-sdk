@@ -117,7 +117,7 @@ export class Producer<
         propagation.inject(context.active(), jobData);
 
         try {
-          const { data, error, response } = await this.apiClient.POST('/jobs', {
+          const { data, error, response } = await this.apiClient.POST('/v1/jobs', {
             body: jobData,
           });
 
@@ -206,7 +206,7 @@ export class Producer<
         const endTimer = this.metrics.producerStageCreateDuration.startTimer();
 
         try {
-          const jobResponse = await this.apiClient.GET(`/jobs/{jobId}`, { params: { path: { jobId } } });
+          const jobResponse = await this.apiClient.GET(`/v1/jobs/{jobId}`, { params: { path: { jobId } } });
 
           if (jobResponse.error !== undefined) {
             throw new ProducerError(
@@ -225,7 +225,7 @@ export class Producer<
 
           propagation.inject(context.active(), jobResponse.data);
 
-          const { data, error, response } = await this.apiClient.POST(`/jobs/{jobId}/stage`, {
+          const { data, error, response } = await this.apiClient.POST(`/v1/jobs/{jobId}/stage`, {
             body: { ...stageData, startAsWaiting: createAsWaiting },
             params: { path: { jobId } },
           });
@@ -323,7 +323,7 @@ export class Producer<
       async (span) => {
         const producerSpans: Span[] = [];
 
-        const stageResponse = await this.apiClient.GET(`/stages/{stageId}`, { params: { path: { stageId } } });
+        const stageResponse = await this.apiClient.GET(`/v1/stages/{stageId}`, { params: { path: { stageId } } });
 
         if (stageResponse.error !== undefined) {
           throw new ProducerError(
@@ -373,7 +373,7 @@ export class Producer<
             tasksWithTraceContext.push(taskClone);
           }
 
-          const { error, data, response } = await this.apiClient.POST(`/stages/{stageId}/tasks`, {
+          const { error, data, response } = await this.apiClient.POST(`/v1/stages/{stageId}/tasks`, {
             body: taskData,
             params: { path: { stageId } },
           });

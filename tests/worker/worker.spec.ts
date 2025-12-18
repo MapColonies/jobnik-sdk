@@ -114,14 +114,14 @@ describe('Worker', () => {
         const events = collectEvents(worker);
 
         // Mock successful API calls - simplified without chaining
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         mockPool
-          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${mockTask.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: mockTask.stageId, jobId: 'aaaaa', type: stageType, userMetadata: {} }));
         mockPool
-          .intercept({ path: `/jobs/aaaaa`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/aaaaa`, method: 'GET' })
           .reply(200, JSON.stringify({ id: 'aaaaa', type: 'image-processing', userMetadata: {} }));
 
         void worker.start();
@@ -140,7 +140,7 @@ describe('Worker', () => {
         let taskIndex = 0;
 
         mockPool
-          .intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' })
+          .intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' })
           .reply(200, () => {
             const task = tasks[taskIndex];
             taskIndex++;
@@ -149,20 +149,20 @@ describe('Worker', () => {
           .times(3); // Two tasks + one null to stop
         // Return 404 for "no more tasks" case
         mockPool
-          .intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' })
+          .intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' })
           .reply(404, JSON.stringify(null))
           .persist();
         mockPool
-          .intercept({ path: /\/tasks\/.+\/completed/, method: 'PUT' })
+          .intercept({ path: /\/v1\/tasks\/.+\/completed/, method: 'PUT' })
           .reply(200, JSON.stringify({ success: true }))
           .times(2);
 
         mockPool
-          .intercept({ path: `/stages/${tasks[0]!.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${tasks[0]!.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: tasks[0]!.stageId, jobId: 'aaaaa', type: stageType, userMetadata: {} }))
           .persist();
         mockPool
-          .intercept({ path: `/jobs/aaaaa`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/aaaaa`, method: 'GET' })
           .reply(200, JSON.stringify({ id: 'aaaaa', type: 'image-processing', userMetadata: {} }))
           .persist();
 
@@ -196,12 +196,11 @@ describe('Worker', () => {
           expect(context.job).toEqual(mockJob);
         });
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
-        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStage));
-        mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(200, JSON.stringify(mockJob));
-
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStage));
+        mockPool.intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' }).reply(200, JSON.stringify(mockJob));
         void worker.start();
         await vi.advanceTimersByTimeAsync(10000);
         vi.runAllTicks();
@@ -220,20 +219,20 @@ describe('Worker', () => {
 
         taskHandler.mockRejectedValue(taskError);
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         mockPool
-          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${mockTask.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: mockTask.stageId, jobId: 'aaaaa', type: stageType, userMetadata: {} }));
         mockPool
-          .intercept({ path: `/jobs/aaaaa`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/aaaaa`, method: 'GET' })
           .reply(200, JSON.stringify({ id: 'aaaaa', type: 'image-processing', userMetadata: {} }));
         mockPool
-          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${mockTask.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: mockTask.stageId, jobId: 'aaaaa', type: stageType, userMetadata: {} }));
         mockPool
-          .intercept({ path: `/jobs/aaaaa`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/aaaaa`, method: 'GET' })
           .reply(200, JSON.stringify({ id: 'aaaaa', type: 'image-processing', userMetadata: {} }));
 
         const events = collectEvents(worker);
@@ -259,20 +258,20 @@ describe('Worker', () => {
 
         taskHandler.mockRejectedValue(taskError);
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(null));
         mockPool
-          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${mockTask.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: mockTask.stageId, jobId: 'aaaaa', type: stageType, userMetadata: {} }))
           .persist();
         mockPool
-          .intercept({ path: `/jobs/aaaaa`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/aaaaa`, method: 'GET' })
           .reply(200, JSON.stringify({ id: 'aaaaa', type: 'image-processing', userMetadata: {} }))
           .persist();
 
         mockPool
-          .intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' })
+          .intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' })
           .reply(200, JSON.stringify({ success: true }))
           .persist();
 
@@ -297,9 +296,9 @@ describe('Worker', () => {
     describe('Bad Path - API Failures', () => {
       it('should handle dequeue API failures', async () => {
         mockPool
-          .intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' })
+          .intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' })
           .reply(500, JSON.stringify({ error: 'Internal Server Error' }));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
 
         const events = collectEvents(worker);
 
@@ -318,10 +317,10 @@ describe('Worker', () => {
         const events = collectEvents(worker);
 
         // Mock successful API calls - simplified without chaining
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(500, JSON.stringify({ error: true }));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(500, JSON.stringify({ error: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(500, JSON.stringify({ error: true }));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(500, JSON.stringify({ error: true }));
 
         vi.spyOn(logger, 'error').mockImplementationOnce(() => {
           throw new Error('Simulated logging failure');
@@ -340,10 +339,10 @@ describe('Worker', () => {
         const mockTask = createMockTask({ id: 'task-stage-fetch-fail' as TaskId });
         const stageId = mockTask.stageId;
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(404, JSON.stringify({ error: 'Stage not found' }));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/stages/${stageId}`, method: 'GET' }).reply(404, JSON.stringify({ error: 'Stage not found' }));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
 
         const events = collectEvents(worker);
 
@@ -364,11 +363,10 @@ describe('Worker', () => {
         const mockTask = createMockTask({ id: 'task-stage-fetch-error' as TaskId });
         const stageId = mockTask.stageId;
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(500, JSON.stringify({ error: 'Internal Server Error' }));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
-
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/stages/${stageId}`, method: 'GET' }).reply(500, JSON.stringify({ error: 'Internal Server Error' }));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         const events = collectEvents(worker);
 
         void worker.start();
@@ -387,12 +385,11 @@ describe('Worker', () => {
 
         const mockStage = { id: stageId, jobId, type: stageType, userMetadata: {} };
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStage));
-        mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(404, JSON.stringify({ error: 'Job not found' }));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
-
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStage));
+        mockPool.intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' }).reply(404, JSON.stringify({ error: 'Job not found' }));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         const events = collectEvents(worker);
 
         void worker.start();
@@ -415,12 +412,11 @@ describe('Worker', () => {
 
         const mockStage = { id: stageId, jobId, type: stageType, userMetadata: {} };
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStage));
-        mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(500, JSON.stringify({ error: 'Internal Server Error' }));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
-
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStage));
+        mockPool.intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' }).reply(500, JSON.stringify({ error: 'Internal Server Error' }));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         const events = collectEvents(worker);
 
         void worker.start();
@@ -438,7 +434,7 @@ describe('Worker', () => {
     describe('Happy Path', () => {
       it('should start and stop cleanly with no tasks', async () => {
         mockPool
-          .intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' })
+          .intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' })
           .reply(404, JSON.stringify(null))
           .persist();
 
@@ -478,15 +474,15 @@ describe('Worker', () => {
           }
         });
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         mockPool
-          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${mockTask.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: mockTask.stageId, jobId: 'aaaaa', type: stageType, userMetadata: {} }))
           .persist();
         mockPool
-          .intercept({ path: `/jobs/aaaaa`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/aaaaa`, method: 'GET' })
           .reply(200, JSON.stringify({ id: 'aaaaa', type: 'image-processing', userMetadata: {} }))
           .persist();
 
@@ -550,15 +546,15 @@ describe('Worker', () => {
           return Promise.resolve();
         });
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         mockPool
-          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${mockTask.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: mockTask.stageId, jobId: 'aaaaa', type: stageType, userMetadata: {} }))
           .persist();
         mockPool
-          .intercept({ path: `/jobs/aaaaa`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/aaaaa`, method: 'GET' })
           .reply(200, JSON.stringify({ id: 'aaaaa', type: 'image-processing', userMetadata: {} }))
           .persist();
 
@@ -579,15 +575,15 @@ describe('Worker', () => {
       it('should provide task handler with proper context', async () => {
         const mockTask = createMockTask({ id: 'task-context' as TaskId });
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         mockPool
-          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${mockTask.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: mockTask.stageId, jobId: 'aaaaa', type: stageType, userMetadata: {} }))
           .persist();
         mockPool
-          .intercept({ path: `/jobs/aaaaa`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/aaaaa`, method: 'GET' })
           .reply(200, JSON.stringify({ id: 'aaaaa', type: 'image-processing', userMetadata: {} }))
           .persist();
 
@@ -618,16 +614,16 @@ describe('Worker', () => {
           await context.updateJobUserMetadata(newMetadata);
         });
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         mockPool
-          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${mockTask.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: mockTask.stageId, jobId, type: stageType, userMetadata: {} }));
         mockPool
-          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
-        mockPool.intercept({ path: `/jobs/${jobId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/jobs/${jobId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
 
         void worker.start();
         await vi.advanceTimersByTimeAsync(10000);
@@ -647,16 +643,16 @@ describe('Worker', () => {
           await context.updateStageUserMetadata(newMetadata);
         });
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         mockPool
-          .intercept({ path: `/stages/${stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: stageId, jobId, type: stageType, userMetadata: {} }));
         mockPool
-          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
-        mockPool.intercept({ path: `/stages/${stageId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
 
         void worker.start();
         await vi.advanceTimersByTimeAsync(10000);
@@ -676,16 +672,16 @@ describe('Worker', () => {
           await context.updateTaskUserMetadata(newMetadata);
         });
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         mockPool
-          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${mockTask.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: mockTask.stageId, jobId, type: stageType, userMetadata: {} }));
         mockPool
-          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
-        mockPool.intercept({ path: `/tasks/${taskId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/tasks/${taskId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
 
         void worker.start();
         await vi.advanceTimersByTimeAsync(10000);
@@ -707,18 +703,18 @@ describe('Worker', () => {
           await context.updateTaskUserMetadata({ taskInfo: 'updated' });
         });
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
         mockPool
-          .intercept({ path: `/stages/${stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: stageId, jobId, type: stageType, userMetadata: {} }));
         mockPool
-          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
-        mockPool.intercept({ path: `/jobs/${jobId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
-        mockPool.intercept({ path: `/stages/${stageId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
-        mockPool.intercept({ path: `/tasks/${taskId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/jobs/${jobId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/stages/${stageId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/tasks/${taskId}/user-metadata`, method: 'PATCH' }).reply(200, JSON.stringify({ success: true }));
 
         void worker.start();
         await vi.advanceTimersByTimeAsync(10000);
@@ -739,16 +735,18 @@ describe('Worker', () => {
           await context.updateJobUserMetadata(newMetadata);
         });
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
         mockPool
-          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${mockTask.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: mockTask.stageId, jobId, type: stageType, userMetadata: {} }));
         mockPool
-          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
-        mockPool.intercept({ path: `/jobs/${jobId}/user-metadata`, method: 'PATCH' }).reply(500, JSON.stringify({ error: 'Internal Server Error' }));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool
+          .intercept({ path: `/v1/jobs/${jobId}/user-metadata`, method: 'PATCH' })
+          .reply(500, JSON.stringify({ error: 'Internal Server Error' }));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
 
         const events = collectEvents(worker);
 
@@ -772,18 +770,18 @@ describe('Worker', () => {
           await context.updateStageUserMetadata(newMetadata);
         });
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
         mockPool
-          .intercept({ path: `/stages/${stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: stageId, jobId, type: stageType, userMetadata: {} }));
         mockPool
-          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
         mockPool
-          .intercept({ path: `/stages/${stageId}/user-metadata`, method: 'PATCH' })
+          .intercept({ path: `/v1/stages/${stageId}/user-metadata`, method: 'PATCH' })
           .reply(500, JSON.stringify({ error: 'Internal Server Error' }));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
 
         const events = collectEvents(worker);
 
@@ -807,18 +805,18 @@ describe('Worker', () => {
           await context.updateTaskUserMetadata(newMetadata);
         });
 
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
-        mockPool.intercept({ path: `/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(200, JSON.stringify(mockTask));
+        mockPool.intercept({ path: `/v1/stages/${stageType}/tasks/dequeue`, method: 'PATCH' }).reply(404, JSON.stringify(null));
         mockPool
-          .intercept({ path: `/stages/${mockTask.stageId}`, method: 'GET' })
+          .intercept({ path: `/v1/stages/${mockTask.stageId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: mockTask.stageId, jobId, type: stageType, userMetadata: {} }));
         mockPool
-          .intercept({ path: `/jobs/${jobId}`, method: 'GET' })
+          .intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' })
           .reply(200, JSON.stringify({ id: jobId, type: 'image-processing', userMetadata: {} }));
         mockPool
-          .intercept({ path: `/tasks/${taskId}/user-metadata`, method: 'PATCH' })
+          .intercept({ path: `/v1/tasks/${taskId}/user-metadata`, method: 'PATCH' })
           .reply(500, JSON.stringify({ error: 'Internal Server Error' }));
-        mockPool.intercept({ path: `/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
+        mockPool.intercept({ path: `/v1/tasks/${mockTask.id}/status`, method: 'PUT' }).reply(200, JSON.stringify({ success: true }));
 
         const events = collectEvents(worker);
 

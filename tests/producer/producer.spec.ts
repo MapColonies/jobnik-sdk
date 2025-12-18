@@ -119,7 +119,7 @@ describe('Producer', () => {
           updatedAt: new Date().toISOString(),
         };
 
-        mockPool.intercept({ path: '/jobs', method: 'POST' }).reply(201, JSON.stringify(mockResponse), {
+        mockPool.intercept({ path: '/v1/jobs', method: 'POST' }).reply(201, JSON.stringify(mockResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
@@ -150,7 +150,7 @@ describe('Producer', () => {
           updatedAt: new Date().toISOString(),
         };
 
-        mockPool.intercept({ path: '/jobs', method: 'POST' }).reply(201, JSON.stringify(mockResponse), {
+        mockPool.intercept({ path: '/v1/jobs', method: 'POST' }).reply(201, JSON.stringify(mockResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
@@ -173,7 +173,7 @@ describe('Producer', () => {
           code: 'VALIDATION_ERROR',
         };
 
-        mockPool.intercept({ path: '/jobs', method: 'POST' }).reply(400, JSON.stringify(errorResponse), {
+        mockPool.intercept({ path: '/v1/jobs', method: 'POST' }).reply(400, JSON.stringify(errorResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
@@ -196,7 +196,7 @@ describe('Producer', () => {
           code: 'UNKNOWN_ERROR',
         };
 
-        mockPool.intercept({ path: '/jobs', method: 'POST' }).reply(500, JSON.stringify(errorResponse), {
+        mockPool.intercept({ path: '/v1/jobs', method: 'POST' }).reply(500, JSON.stringify(errorResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
@@ -234,7 +234,7 @@ describe('Producer', () => {
           tracestate: 'vendor=test',
         };
 
-        mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(200, JSON.stringify(mockJobResponse), {
+        mockPool.intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' }).reply(200, JSON.stringify(mockJobResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
@@ -252,7 +252,7 @@ describe('Producer', () => {
           tracestate: 'vendor=test',
         };
 
-        mockPool.intercept({ path: `/jobs/${jobId}/stage`, method: 'POST' }).reply(201, JSON.stringify(mockStageResponse), {
+        mockPool.intercept({ path: `/v1/jobs/${jobId}/stage`, method: 'POST' }).reply(201, JSON.stringify(mockStageResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
@@ -273,7 +273,7 @@ describe('Producer', () => {
           data: {},
         };
 
-        mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(
+        mockPool.intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' }).reply(
           404,
           JSON.stringify({
             message: 'Job does not exist',
@@ -313,12 +313,12 @@ describe('Producer', () => {
           tracestate: 'vendor=test',
         };
 
-        mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(200, JSON.stringify(mockJobResponse), {
+        mockPool.intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' }).reply(200, JSON.stringify(mockJobResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
         // Mock failed stage creation
-        mockPool.intercept({ path: `/jobs/${jobId}/stage`, method: 'POST' }).reply(
+        mockPool.intercept({ path: `/v1/jobs/${jobId}/stage`, method: 'POST' }).reply(
           400,
           JSON.stringify({
             message: 'Stage type not supported',
@@ -355,7 +355,7 @@ describe('Producer', () => {
           },
         ];
 
-        // Mock GET /stages/{stageId}
+        // Mock GET /v1/stages/{stageId}
         const mockStageResponse = {
           id: stageId,
           jobId: 'job-123' as JobId,
@@ -370,11 +370,11 @@ describe('Producer', () => {
           tracestate: 'vendor=test',
         };
 
-        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStageResponse), {
+        mockPool.intercept({ path: `/v1/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStageResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
-        // Mock POST /stages/{stageId}/tasks
+        // Mock POST /v1/stages/{stageId}/tasks
         const mockTasksResponse = [
           {
             id: 'task-id-1',
@@ -396,7 +396,7 @@ describe('Producer', () => {
           },
         ];
 
-        mockPool.intercept({ path: `/stages/${stageId}/tasks`, method: 'POST' }).reply(201, JSON.stringify(mockTasksResponse), {
+        mockPool.intercept({ path: `/v1/stages/${stageId}/tasks`, method: 'POST' }).reply(201, JSON.stringify(mockTasksResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
@@ -432,11 +432,11 @@ describe('Producer', () => {
           tracestate: 'vendor=test',
         };
 
-        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStageResponse), {
+        mockPool.intercept({ path: `/v1/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStageResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
-        // Mock POST /stages/{stageId}/tasks
+        // Mock POST /v1/stages/{stageId}/tasks
         const mockTasksResponse = [
           {
             id: 'task-img-1',
@@ -449,7 +449,7 @@ describe('Producer', () => {
           },
         ];
 
-        mockPool.intercept({ path: `/stages/${stageId}/tasks`, method: 'POST' }).reply(201, JSON.stringify(mockTasksResponse), {
+        mockPool.intercept({ path: `/v1/stages/${stageId}/tasks`, method: 'POST' }).reply(201, JSON.stringify(mockTasksResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
@@ -478,7 +478,7 @@ describe('Producer', () => {
           },
         ];
 
-        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(
+        mockPool.intercept({ path: `/v1/stages/${stageId}`, method: 'GET' }).reply(
           404,
           JSON.stringify({
             message: 'Stage does not exist',
@@ -504,7 +504,7 @@ describe('Producer', () => {
           },
         ];
 
-        // Mock GET /stages/{stageId} with different stage type
+        // Mock GET /v1/stages/{stageId} with different stage type
         const mockStageResponse = {
           id: stageId,
           jobId: 'job-123' as JobId,
@@ -517,7 +517,7 @@ describe('Producer', () => {
           traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
         };
 
-        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStageResponse), {
+        mockPool.intercept({ path: `/v1/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStageResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
@@ -550,12 +550,12 @@ describe('Producer', () => {
           traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
         };
 
-        mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStageResponse), {
+        mockPool.intercept({ path: `/v1/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStageResponse), {
           headers: { 'content-type': 'application/json' },
         });
 
         // Mock failed task creation
-        mockPool.intercept({ path: `/stages/${stageId}/tasks`, method: 'POST' }).reply(
+        mockPool.intercept({ path: `/v1/stages/${stageId}/tasks`, method: 'POST' }).reply(
           400,
           JSON.stringify({
             message: 'Task validation failed',
@@ -597,7 +597,7 @@ describe('Producer', () => {
         updatedAt: new Date().toISOString(),
       };
 
-      mockPool.intercept({ path: '/jobs', method: 'POST' }).reply(201, JSON.stringify(mockJobResponse), {
+      mockPool.intercept({ path: '/v1/jobs', method: 'POST' }).reply(201, JSON.stringify(mockJobResponse), {
         headers: { 'content-type': 'application/json' },
       });
 
@@ -617,7 +617,7 @@ describe('Producer', () => {
         traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
       };
 
-      mockPool.intercept({ path: `/jobs/${jobId}`, method: 'GET' }).reply(200, JSON.stringify(mockJobForStage), {
+      mockPool.intercept({ path: `/v1/jobs/${jobId}`, method: 'GET' }).reply(200, JSON.stringify(mockJobForStage), {
         headers: { 'content-type': 'application/json' },
       });
 
@@ -632,7 +632,7 @@ describe('Producer', () => {
         updatedAt: new Date().toISOString(),
       };
 
-      mockPool.intercept({ path: `/jobs/${jobId}/stage`, method: 'POST' }).reply(201, JSON.stringify(mockStageResponse), {
+      mockPool.intercept({ path: `/v1/jobs/${jobId}/stage`, method: 'POST' }).reply(201, JSON.stringify(mockStageResponse), {
         headers: { 'content-type': 'application/json' },
       });
 
@@ -657,7 +657,7 @@ describe('Producer', () => {
         traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
       };
 
-      mockPool.intercept({ path: `/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStageForTasks), {
+      mockPool.intercept({ path: `/v1/stages/${stageId}`, method: 'GET' }).reply(200, JSON.stringify(mockStageForTasks), {
         headers: { 'content-type': 'application/json' },
       });
 
@@ -682,7 +682,7 @@ describe('Producer', () => {
         },
       ];
 
-      mockPool.intercept({ path: `/stages/${stageId}/tasks`, method: 'POST' }).reply(201, JSON.stringify(mockTasksResponse), {
+      mockPool.intercept({ path: `/v1/stages/${stageId}/tasks`, method: 'POST' }).reply(201, JSON.stringify(mockTasksResponse), {
         headers: { 'content-type': 'application/json' },
       });
 
