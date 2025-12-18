@@ -1,6 +1,6 @@
 {
   "name": "@map-colonies/jobnik-sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Map Colonies Jobnik SDK",
   "main": "./dist/index.js",
   "exports": {
