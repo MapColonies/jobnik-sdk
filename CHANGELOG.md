@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/MapColonies/jobnik-sdk/compare/v0.2.0...v0.3.0) (2025-12-18)
+
+
+### Features
+
+* update API paths to include versioning MAPCO-9289 ([#65](https://github.com/MapColonies/jobnik-sdk/issues/65)) ([9056334](https://github.com/MapColonies/jobnik-sdk/commit/90563344157538e1861dba50f5a523c6a4982e78))
+
+
+### Bug Fixes
+
+* changed InitParam to solve typedoc problems ([#62](https://github.com/MapColonies/jobnik-sdk/issues/62)) ([3d90cfa](https://github.com/MapColonies/jobnik-sdk/commit/3d90cfa82c387cbc8ab72cba9f2d90cf88b446b3))
+
 ## [0.2.0](https://github.com/MapColonies/jobnik-sdk/compare/v0.1.0...v0.2.0) (2025-11-30)
 
 
