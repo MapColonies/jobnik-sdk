@@ -1,17 +1,13 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import circuitBreaker, { type Options as OpossumOptions } from 'opossum';
 import { context, propagation, type Span, SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
+import { INFRA_JOBNIK_STAGE_ID } from '@map-colonies/semantic-conventions';
 import type { ApiClient } from '../api';
 import type { Logger } from '../types';
 import type { Stage, StageData, StageTypesTemplate, ValidStageType } from '../types/stage';
 import { getErrorMessageFromUnknown, presult } from '../common/utils';
 import type { Task } from '../types/task';
-import {
-  ATTR_JOB_MANAGER_STAGE_ID,
-  ATTR_MESSAGING_BATCH_MESSAGE_COUNT,
-  ATTR_MESSAGING_DESTINATION_NAME,
-  ATTR_MESSAGING_MESSAGE_ID,
-} from '../telemetry/semconv';
+import { ATTR_MESSAGING_BATCH_MESSAGE_COUNT, ATTR_MESSAGING_DESTINATION_NAME, ATTR_MESSAGING_MESSAGE_ID } from '../telemetry/semconv';
 import type { Job, JobData, JobTypesTemplate, ValidJobType } from '../types/job';
 import { BASE_ATTRIBUTES, tracer } from '../telemetry/trace';
 import type { IWorker, TaskHandler, TaskHandlerContext, WorkerOptions } from '../types/worker';
@@ -403,7 +399,7 @@ export class Worker<
             kind: SpanKind.INTERNAL,
             attributes: {
               [ATTR_MESSAGING_MESSAGE_ID]: task.id,
-              [ATTR_JOB_MANAGER_STAGE_ID]: task.stageId,
+              [INFRA_JOBNIK_STAGE_ID]: task.stageId,
               [ATTR_MESSAGING_DESTINATION_NAME]: this.stageType,
               ...BASE_ATTRIBUTES,
             },
@@ -445,7 +441,7 @@ export class Worker<
             {
               taskId: task.id,
               stageType: this.stageType,
-              error: getErrorMessageFromUnknown(error),
+              err: getErrorMessageFromUnknown(error),
             },
             'Task handler failed'
           );
@@ -457,7 +453,7 @@ export class Worker<
               {
                 taskId: task.id,
                 stageType: this.stageType,
-                error: getErrorMessageFromUnknown(err),
+                err: getErrorMessageFromUnknown(err),
               },
               'Error occurred while marking task as failed'
             );
@@ -488,7 +484,7 @@ export class Worker<
           {
             taskId: task.id,
             stageType: this.stageType,
-            error: getErrorMessageFromUnknown(error),
+            err: getErrorMessageFromUnknown(error),
           },
           'Error occurred while processing task'
         );
@@ -564,7 +560,7 @@ export class Worker<
         this.logger.debug(
           {
             stageType: this.stageType,
-            error: getErrorMessageFromUnknown(err),
+            err: getErrorMessageFromUnknown(err),
           },
           'Error while dequeuing task'
         );
@@ -602,7 +598,7 @@ export class Worker<
         }
 
         span.setAttributes({
-          [ATTR_JOB_MANAGER_STAGE_ID]: task.stageId,
+          [INFRA_JOBNIK_STAGE_ID]: task.stageId,
           [ATTR_MESSAGING_MESSAGE_ID]: task.id,
         });
 
@@ -762,7 +758,7 @@ export class Worker<
         this.logger.error(
           {
             jobId,
-            error: getErrorMessageFromUnknown(error),
+            err: getErrorMessageFromUnknown(error),
           },
           'Failed to update job user metadata'
         );
@@ -782,7 +778,7 @@ export class Worker<
         this.logger.error(
           {
             stageId,
-            error: getErrorMessageFromUnknown(error),
+            err: getErrorMessageFromUnknown(error),
           },
           'Failed to update stage user metadata'
         );
@@ -802,7 +798,7 @@ export class Worker<
         this.logger.error(
           {
             taskId,
-            error: getErrorMessageFromUnknown(error),
+            err: getErrorMessageFromUnknown(error),
           },
           'Failed to update task user metadata'
         );
