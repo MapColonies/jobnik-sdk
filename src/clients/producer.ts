@@ -1,5 +1,5 @@
 import { type Span, SpanKind, SpanStatusCode, context, propagation, trace } from '@opentelemetry/api';
-import { INFRA_JOBNIK_JOB_NAME, INFRA_JOBNIK_JOB_PRIORITY, INFRA_JOBNIK_STAGE_ID, INFRA_JOBNIK_STAGE_ID } from '@map-colonies/semantic-conventions';
+import { INFRA_JOBNIK_JOB_NAME, INFRA_JOBNIK_JOB_PRIORITY, INFRA_JOBNIK_STAGE_ID } from '@map-colonies/semantic-conventions';
 import type { ApiClient } from '../api';
 import type { components } from '../types/openapi';
 import type { JobId, StageId } from '../types/brands';
