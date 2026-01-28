@@ -3,19 +3,19 @@
 import { Logger } from './logger';
 
 export class NoopLogger implements Logger {
-  public debug(obj: object, msg?: string, ...args: any[]): void {
+  public debug(obj: object | string, ...args: any[]): void {
     // No-op
   }
 
-  public info(obj: object, msg?: string, ...args: any[]): void {
+  public info(obj: object | string, ...args: any[]): void {
     // No-op
   }
 
-  public warn(obj: object, msg?: string, ...args: any[]): void {
+  public warn(obj: object | string, ...args: any[]): void {
     // No-op
   }
 
-  public error(obj: object, msg?: string, ...args: any[]): void {
+  public error(obj: object | string, ...args: any[]): void {
     // No-op
   }
 }
