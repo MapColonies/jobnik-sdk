@@ -2,7 +2,9 @@
  * @inline
  */
 export interface LogFn {
-  (obj: object, message?: string, ...args: unknown[]): void;
+  (obj: object, ...args: unknown[]): void;
+  (obj: object, msg: string, ...args: unknown[]): void;
+  (msg: string, ...args: unknown[]): void;
 }
 
 export interface Logger {

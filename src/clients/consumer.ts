@@ -1,12 +1,13 @@
 import { SpanKind, context, propagation, trace } from '@opentelemetry/api';
 import { StatusCodes } from 'http-status-codes';
+import { INFRA_JOBNIK_TASK_ATTEMPTS, INFRA_JOBNIK_TASK_STATUS } from '@map-colonies/semantic-conventions';
 import type { ApiClient } from '../api';
 import type { TaskId } from '../types/brands';
 import type { InferTaskData, Task } from '../types/task';
 import type { ValidStageType, StageTypesTemplate } from '../types/stage';
 import type { components } from '../types/openapi';
 import { DEFAULT_SPAN_CONTEXT, withSpan } from '../telemetry/trace';
-import { JOB_MANAGER_TASK_ATTEMPTS, JOB_MANAGER_TASK_STATUS, ATTR_MESSAGING_DESTINATION_NAME, ATTR_MESSAGING_MESSAGE_ID } from '../telemetry/semconv';
+import { ATTR_MESSAGING_DESTINATION_NAME, ATTR_MESSAGING_MESSAGE_ID } from '../telemetry/semconv';
 import type { Logger } from '../types';
 import type { IConsumer } from '../types/consumer';
 import { createAPIErrorFromResponse } from '../errors/utils';
@@ -142,7 +143,7 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
 
         span.setAttributes({
           [ATTR_MESSAGING_MESSAGE_ID]: data.id,
-          [JOB_MANAGER_TASK_ATTEMPTS]: data.attempts,
+          [INFRA_JOBNIK_TASK_ATTEMPTS]: data.attempts,
         });
 
         return data as Task<InferTaskData<StageType, StageTypes>>;
@@ -214,19 +215,17 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
     const statusLower = status.toLowerCase() as 'completed' | 'failed';
     const endTimer = stageType !== undefined ? this.metrics.consumerTaskUpdateDuration.startTimer() : null;
 
-    this.logger.debug(
-      {
-        taskId: options.taskId ?? options.task.id,
-      },
-      `Marking task as ${status}`
-    );
+    this.logger.debug({
+      taskId: options.taskId ?? options.task.id,
+      msg: `Marking task as ${status}`,
+    });
 
     return withSpan(
       'update_status',
       {
         attributes: {
           [ATTR_MESSAGING_MESSAGE_ID]: options.taskId ?? options.task.id,
-          [JOB_MANAGER_TASK_STATUS]: status,
+          [INFRA_JOBNIK_TASK_STATUS]: status,
         },
         kind: SpanKind.CLIENT,
       },
@@ -276,16 +275,14 @@ export class Consumer<StageTypes extends StageTypesTemplate<StageTypes> = {}> im
           this.metrics.consumerTaskUpdatesTotal.labels(stageType, statusLower, 'success').inc();
         }
 
-        this.logger.info(
-          {
-            duration,
-            status: 'success',
-            metadata: {
-              taskId: task.id,
-            },
+        this.logger.info({
+          duration,
+          msg: `Task marked as ${status}`,
+          status: 'success',
+          metadata: {
+            taskId: task.id,
           },
-          `Task marked as ${status}`
-        );
+        });
       }
     );
   }

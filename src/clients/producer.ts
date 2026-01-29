@@ -1,4 +1,5 @@
 import { type Span, SpanKind, SpanStatusCode, context, propagation, trace } from '@opentelemetry/api';
+import { INFRA_JOBNIK_JOB_NAME, INFRA_JOBNIK_JOB_PRIORITY, INFRA_JOBNIK_STAGE_ID } from '@map-colonies/semantic-conventions';
 import type { ApiClient } from '../api';
 import type { components } from '../types/openapi';
 import type { JobId, StageId } from '../types/brands';
@@ -7,14 +8,7 @@ import type { InferStageData, NewStage, Stage, StageData, StageTypesTemplate, Va
 import type { InferTaskData, NewTask, Task } from '../types/task';
 import type { IProducer } from '../types/producer';
 import { DEFAULT_SPAN_CONTEXT, tracer, withSpan } from '../telemetry/trace';
-import {
-  ATTR_JOB_MANAGER_JOB_NAME,
-  ATTR_JOB_MANAGER_JOB_PRIORITY,
-  ATTR_JOB_MANAGER_STAGE_ID,
-  ATTR_MESSAGING_BATCH_MESSAGE_COUNT,
-  ATTR_MESSAGING_DESTINATION_NAME,
-  ATTR_MESSAGING_MESSAGE_CONVERSATION_ID,
-} from '../telemetry/semconv';
+import { ATTR_MESSAGING_BATCH_MESSAGE_COUNT, ATTR_MESSAGING_DESTINATION_NAME, ATTR_MESSAGING_MESSAGE_CONVERSATION_ID } from '../telemetry/semconv';
 import { Logger } from '../types';
 import { createAPIErrorFromResponse } from '../errors/utils';
 import { JOBNIK_SDK_ERROR_CODES, ProducerError } from '../errors';
@@ -104,8 +98,8 @@ export class Producer<
       `create_job ${jobData.name}`,
       {
         attributes: {
-          [ATTR_JOB_MANAGER_JOB_NAME]: jobData.name,
-          [ATTR_JOB_MANAGER_JOB_PRIORITY]: priority,
+          [INFRA_JOBNIK_JOB_NAME]: jobData.name,
+          [INFRA_JOBNIK_JOB_PRIORITY]: priority,
         },
         kind: SpanKind.CLIENT,
       },
@@ -255,7 +249,7 @@ export class Producer<
             'Stage created successfully'
           );
 
-          span.setAttribute(ATTR_JOB_MANAGER_STAGE_ID, data.id);
+          span.setAttribute(INFRA_JOBNIK_STAGE_ID, data.id);
           return data as Stage<StageType, InferStageData<StageType, StageTypes>>;
         } catch (error) {
           endTimer({ stage_type: stageData.type as string, result: 'error' });
@@ -314,7 +308,7 @@ export class Producer<
       `send ${stageType}`,
       {
         attributes: {
-          [ATTR_JOB_MANAGER_STAGE_ID]: stageId,
+          [INFRA_JOBNIK_STAGE_ID]: stageId,
           [ATTR_MESSAGING_DESTINATION_NAME]: stageType,
           [ATTR_MESSAGING_BATCH_MESSAGE_COUNT]: taskData.length,
         },

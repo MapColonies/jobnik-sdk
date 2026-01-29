@@ -43,9 +43,3 @@ export const ATTR_SERVER_ADDRESS = 'server.address';
 export const ATTR_SERVER_PORT = 'server.port';
 // Error type if the messaging operation failed
 export const ATTR_ERROR_TYPE = 'error.type';
-
-export const ATTR_JOB_MANAGER_JOB_NAME = 'job_manager.job.name';
-export const ATTR_JOB_MANAGER_JOB_PRIORITY = 'job_manager.job.priority';
-export const ATTR_JOB_MANAGER_STAGE_ID = 'job_manager.stage.id';
-export const JOB_MANAGER_TASK_STATUS = 'job_manager.task.status';
-export const JOB_MANAGER_TASK_ATTEMPTS = 'job_manager.task.attempts';
