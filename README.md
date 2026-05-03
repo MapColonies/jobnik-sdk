@@ -27,7 +27,7 @@ npm install @map-colonies/jobnik-sdk
 import { JobnikSDK } from '@map-colonies/jobnik-sdk';
 
 const sdk = new JobnikSDK({
-  baseUrl: 'https://api.jobnik.example.com'
+  baseUrl: 'https://api.jobnik.example.com',
   metricsRegistry: new Registry()
 });
 ```
@@ -54,7 +54,7 @@ interface MyStageTypes {
 }
 
 const sdk = new JobnikSDK<MyJobTypes, MyStageTypes>({
-  baseUrl: 'https://api.jobnik.example.com'
+  baseUrl: 'https://api.jobnik.example.com',
   metricsRegistry: new Registry()
 });
 ```
@@ -80,10 +80,10 @@ const stage = await producer.createStage(job.id, {
 });
 
 // Add tasks to the stage
-const task = await producer.createTask(stage.id, {
+const task = await producer.createTasks(stage.id, stage.type, [{
   data: { sourceUrl: 'https://example.com/image.jpg', targetPath: '/output/resized.jpg' },
   userMetadata: { batchId: 'batch-1' }
-});
+}]);
 ```
 
 ### Process Tasks (Worker)
