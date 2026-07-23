@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Job Manager Service - API v1
   description: Job Manager Service API version 1
-  version: 0.1.0
+  version: 0.2.0
   license:
     name: MIT
     url: 'https://opensource.org/licenses/MIT'
@@ -17,6 +17,8 @@ paths:
         - $ref: '#/components/parameters/endDate'
         - $ref: '#/components/parameters/priority'
         - $ref: '#/components/parameters/includeStages'
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/pageSizeParam'
       summary: Retrieve jobs matching criteria
       description: |
         Filter jobs by name, date range, priority. Optional stage inclusion.
@@ -29,9 +31,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/job'
+                $ref: '#/components/schemas/jobsPaginatedResponse'
         '400':
           description: Invalid query parameters
           content:
@@ -652,6 +652,8 @@ paths:
       operationId: getStagesByJobIdV1
       parameters:
         - $ref: '#/components/parameters/includeTasks'
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/pageSizeParam'
       summary: Retrieve all stages for a specific job in execution order
       description: >
         Fetches all stages associated with the specified job ID, automatically
@@ -683,9 +685,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/getStageResponse'
+                $ref: '#/components/schemas/stagesPaginatedResponse'
         '400':
           description: Invalid job ID format or other parameter error
           content:
@@ -888,6 +888,8 @@ paths:
         - $ref: '#/components/parameters/paramStageType'
         - $ref: '#/components/parameters/stageStatus'
         - $ref: '#/components/parameters/includeTasks'
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/pageSizeParam'
       summary: Retrieve stages matching specified criteria
       description: >
         Returns a filtered list of stages based on the provided query
@@ -909,9 +911,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/getStageResponse'
+                $ref: '#/components/schemas/stagesPaginatedResponse'
         '400':
           description: Invalid query parameters
           content:
@@ -1190,15 +1190,16 @@ paths:
 
         Provides complete information about each task including type, status,
         and attempt count.
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/pageSizeParam'
       responses:
         '200':
           description: Successfully retrieved tasks for the specified stage
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/taskResponse'
+                $ref: '#/components/schemas/tasksPaginatedResponse'
         '400':
           description: Invalid stage ID format or other parameter error
           content:
@@ -1572,6 +1573,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/taskNotFoundResponse'
+        '409':
+          description: >-
+            task was claimed by another worker. This occurs when multiple
+            workers attempt to dequeue the same task simultaneously. The client
+            should retry the dequeue operation to get a different task.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/baseErrorResponse'
+                  - type: object
+                    properties:
+                      code:
+                        enum:
+                          - TASK_STATUS_UPDATE_FAILED
         '500':
           description: Internal server error or invalid state transition
           content:
@@ -1604,6 +1620,8 @@ paths:
       - $ref: '#/components/parameters/fromDate'
       - $ref: '#/components/parameters/endDate'
       - $ref: '#/components/parameters/paramsTaskStatus'
+      - $ref: '#/components/parameters/pageParam'
+      - $ref: '#/components/parameters/pageSizeParam'
     get:
       operationId: getTasksByCriteriaV1
       summary: Retrieve tasks matching specified criteria
@@ -1625,9 +1643,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/taskResponse'
+                $ref: '#/components/schemas/tasksPaginatedResponse'
         '400':
           description: Invalid query parameters
           content:
@@ -1820,6 +1836,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/taskNotFoundResponse'
+        '409':
+          description: >-
+            task status was modified by another request. This occurs when
+            multiple workers attempt to update the same task simultaneously. The
+            current state of the task has changed since it was retrieved.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/baseErrorResponse'
+                  - type: object
+                    properties:
+                      code:
+                        enum:
+                          - TASK_STATUS_UPDATE_FAILED
         '500':
           description: Internal server error
           content:
@@ -2517,6 +2548,57 @@ components:
                 - TASK_NOT_FOUND
           required:
             - code
+    jobsPaginatedResponse:
+      type: object
+      description: Paginated list of jobs with total count.
+      required:
+        - total
+        - items
+      additionalProperties: false
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of jobs matching the filter criteria
+        items:
+          type: array
+          description: Page of job records
+          items:
+            $ref: '#/components/schemas/job'
+    stagesPaginatedResponse:
+      type: object
+      description: Paginated list of stages with total count.
+      required:
+        - total
+        - items
+      additionalProperties: false
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of stages matching the filter criteria
+        items:
+          type: array
+          description: Page of stage records
+          items:
+            $ref: '#/components/schemas/getStageResponse'
+    tasksPaginatedResponse:
+      type: object
+      description: Paginated list of tasks with total count.
+      required:
+        - total
+        - items
+      additionalProperties: false
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of tasks matching the filter criteria
+        items:
+          type: array
+          description: Page of task records
+          items:
+            $ref: '#/components/schemas/taskResponse'
   parameters:
     jobId:
       in: path
@@ -2627,3 +2709,24 @@ components:
       required: false
       schema:
         $ref: '#/components/schemas/stageOperationStatusResponse'
+    pageParam:
+      in: query
+      name: page
+      description: >-
+        1-based page number for pagination. Requesting beyond the last page
+        returns an empty items array.
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    pageSizeParam:
+      in: query
+      name: page_size
+      description: Number of items to return per page.
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
