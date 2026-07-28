@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/MapColonies/jobnik-sdk/compare/v1.0.0...v1.0.1) (2026-07-28)
+
+
+### Bug Fixes
+
+* remove pagination parameters from stages API and update response schema ([#73](https://github.com/MapColonies/jobnik-sdk/issues/73)) ([bd55184](https://github.com/MapColonies/jobnik-sdk/commit/bd55184bd19aca99c38f66c550130b34fcd05ac4))
+
 ## [1.0.0](https://github.com/MapColonies/jobnik-sdk/compare/v0.3.0...v1.0.0) (2026-07-28)
 
 
