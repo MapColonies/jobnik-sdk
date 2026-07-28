@@ -1885,7 +1885,7 @@ export interface operations {
           'application/json': components['schemas']['taskNotFoundResponse'];
         };
       };
-      /** @description task was claimed by another worker. This occurs when multiple workers attempt to dequeue the same task simultaneously. The client should retry the dequeue operation to get a different task. */
+      /** @description Task was claimed by another worker. This occurs when multiple workers attempt to dequeue the same task simultaneously. The client should retry the dequeue operation to get a different task. */
       409: {
         headers: {
           [name: string]: unknown;
