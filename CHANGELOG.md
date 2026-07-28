@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.0.0](https://github.com/MapColonies/jobnik-sdk/compare/v0.3.0...v1.0.0) (2026-07-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* changed logger interface and modernized deps ([#69](https://github.com/MapColonies/jobnik-sdk/issues/69))
+
+### Features
+
+* update OpenAPI specification to include pagination parameters and responses MAPCO-9304 ([#72](https://github.com/MapColonies/jobnik-sdk/issues/72)) ([b1bd9ce](https://github.com/MapColonies/jobnik-sdk/commit/b1bd9ce19263df118425e8a5b4e0ddc562d97403))
+
+
+### Bug Fixes
+
+* changed logger interface and modernized deps ([#69](https://github.com/MapColonies/jobnik-sdk/issues/69)) ([06f5a66](https://github.com/MapColonies/jobnik-sdk/commit/06f5a662554b0b8aafa37be14d089175fd9fc48e))
+
 ## [0.3.0](https://github.com/MapColonies/jobnik-sdk/compare/v0.2.0...v0.3.0) (2025-12-18)
 
 
