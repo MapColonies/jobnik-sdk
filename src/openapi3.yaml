@@ -1575,7 +1575,7 @@ paths:
                 $ref: '#/components/schemas/taskNotFoundResponse'
         '409':
           description: >-
-            task was claimed by another worker. This occurs when multiple
+            Task was claimed by another worker. This occurs when multiple
             workers attempt to dequeue the same task simultaneously. The client
             should retry the dequeue operation to get a different task.
           content:
