@@ -441,6 +441,10 @@ export type paths = {
         end_date?: components['parameters']['endDate'];
         /** @description Filter tasks by their operational status */
         status?: components['parameters']['paramsTaskStatus'];
+        /** @description 1-based page number for pagination. Requesting beyond the last page returns an empty items array. */
+        page?: components['parameters']['pageParam'];
+        /** @description Number of items to return per page. */
+        page_size?: components['parameters']['pageSizeParam'];
       };
       header?: never;
       path?: never;
@@ -880,6 +884,27 @@ export type components = {
       /** @enum {unknown} */
       code: 'TASK_NOT_FOUND';
     };
+    /** @description Paginated list of jobs with total count. */
+    jobsPaginatedResponse: {
+      /** @description Total number of jobs matching the filter criteria */
+      total: number;
+      /** @description Page of job records */
+      items: components['schemas']['job'][];
+    };
+    /** @description Paginated list of stages with total count. */
+    stagesPaginatedResponse: {
+      /** @description Total number of stages matching the filter criteria */
+      total: number;
+      /** @description Page of stage records */
+      items: components['schemas']['getStageResponse'][];
+    };
+    /** @description Paginated list of tasks with total count. */
+    tasksPaginatedResponse: {
+      /** @description Total number of tasks matching the filter criteria */
+      total: number;
+      /** @description Page of task records */
+      items: components['schemas']['taskResponse'][];
+    };
   };
   responses: never;
   parameters: {
@@ -915,6 +940,10 @@ export type components = {
      *     Used to find stages in specific execution states.
      *      */
     stageStatus: components['schemas']['stageOperationStatusResponse'];
+    /** @description 1-based page number for pagination. Requesting beyond the last page returns an empty items array. */
+    pageParam: number;
+    /** @description Number of items to return per page. */
+    pageSizeParam: number;
   };
   requestBodies: never;
   headers: never;
@@ -935,6 +964,10 @@ export interface operations {
         priority?: components['parameters']['priority'];
         /** @description When true, includes stage data in the response */
         should_return_stages?: components['parameters']['includeStages'];
+        /** @description 1-based page number for pagination. Requesting beyond the last page returns an empty items array. */
+        page?: components['parameters']['pageParam'];
+        /** @description Number of items to return per page. */
+        page_size?: components['parameters']['pageSizeParam'];
       };
       header?: never;
       path?: never;
@@ -948,7 +981,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['job'][];
+          'application/json': components['schemas']['jobsPaginatedResponse'];
         };
       };
       /** @description Invalid query parameters */
@@ -1314,6 +1347,10 @@ export interface operations {
       query?: {
         /** @description When true, includes task data in the response */
         should_return_tasks?: components['parameters']['includeTasks'];
+        /** @description 1-based page number for pagination. Requesting beyond the last page returns an empty items array. */
+        page?: components['parameters']['pageParam'];
+        /** @description Number of items to return per page. */
+        page_size?: components['parameters']['pageSizeParam'];
       };
       header?: never;
       path: {
@@ -1330,7 +1367,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['getStageResponse'][];
+          'application/json': components['schemas']['stagesPaginatedResponse'];
         };
       };
       /** @description Invalid job ID format or other parameter error */
@@ -1432,6 +1469,10 @@ export interface operations {
         stage_operation_status?: components['parameters']['stageStatus'];
         /** @description When true, includes task data in the response */
         should_return_tasks?: components['parameters']['includeTasks'];
+        /** @description 1-based page number for pagination. Requesting beyond the last page returns an empty items array. */
+        page?: components['parameters']['pageParam'];
+        /** @description Number of items to return per page. */
+        page_size?: components['parameters']['pageSizeParam'];
       };
       header?: never;
       path?: never;
@@ -1445,7 +1486,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['getStageResponse'][];
+          'application/json': components['schemas']['stagesPaginatedResponse'];
         };
       };
       /** @description Invalid query parameters */
@@ -1695,7 +1736,12 @@ export interface operations {
   };
   getTasksByStageIdV1: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description 1-based page number for pagination. Requesting beyond the last page returns an empty items array. */
+        page?: components['parameters']['pageParam'];
+        /** @description Number of items to return per page. */
+        page_size?: components['parameters']['pageSizeParam'];
+      };
       header?: never;
       path: {
         /** @description Unique identifier for the stage */
@@ -1711,7 +1757,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['taskResponse'][];
+          'application/json': components['schemas']['tasksPaginatedResponse'];
         };
       };
       /** @description Invalid stage ID format or other parameter error */
@@ -1839,6 +1885,18 @@ export interface operations {
           'application/json': components['schemas']['taskNotFoundResponse'];
         };
       };
+      /** @description Task was claimed by another worker. This occurs when multiple workers attempt to dequeue the same task simultaneously. The client should retry the dequeue operation to get a different task. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['baseErrorResponse'] & {
+            /** @enum {unknown} */
+            code?: 'TASK_STATUS_UPDATE_FAILED';
+          };
+        };
+      };
       /** @description Internal server error or invalid state transition */
       500: {
         headers: {
@@ -1874,6 +1932,10 @@ export interface operations {
         end_date?: components['parameters']['endDate'];
         /** @description Filter tasks by their operational status */
         status?: components['parameters']['paramsTaskStatus'];
+        /** @description 1-based page number for pagination. Requesting beyond the last page returns an empty items array. */
+        page?: components['parameters']['pageParam'];
+        /** @description Number of items to return per page. */
+        page_size?: components['parameters']['pageSizeParam'];
       };
       header?: never;
       path?: never;
@@ -1887,7 +1949,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['taskResponse'][];
+          'application/json': components['schemas']['tasksPaginatedResponse'];
         };
       };
       /** @description Invalid query parameters */
@@ -2063,6 +2125,18 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['taskNotFoundResponse'];
+        };
+      };
+      /** @description task status was modified by another request. This occurs when multiple workers attempt to update the same task simultaneously. The current state of the task has changed since it was retrieved. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['baseErrorResponse'] & {
+            /** @enum {unknown} */
+            code?: 'TASK_STATUS_UPDATE_FAILED';
+          };
         };
       };
       /** @description Internal server error */
